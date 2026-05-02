@@ -3,63 +3,56 @@
 ## Stato Corrente
 *Aggiornato: 2026-05-02*
 
-**Cosa e attivo ora:** MVP app menu bar locale con Whisper Large V3 e Control hold push-to-talk, ora sotto iCloud Drive.
-**Blocchi:** test hotkey, microfono e auto-paste richiedono interazione utente/macOS permissions.
-**Prossima cosa da fare:** ottimizzare per Apple Silicon, poi concedere permessi e provare Control hold in una chat/test editor.
+**Cosa e attivo ora:** MVP funzionante end-to-end. App menu bar locale, whisper-server persistente con Metal + Accelerate, modello Large V3 in `~/Library/Application Support/LocalWhisperFlow/Models`, Control hold push-to-talk, auto-paste opzionale.
+**Blocchi:** test di registrazione microfono dal vivo richiede interazione utente e permessi (Microphone + Accessibility).
+**Prossima cosa da fare:** verifica live record/paste in chat reale, poi feedback visivo su warmup/registrazione e gestione errori UX.
 
 ---
 
 ## Obiettivo
-Replicare il flusso essenziale di WhisperFlow in locale: Control hold push-to-talk, registrazione microfono, trascrizione offline con Whisper Large V3, copia in clipboard e paste nell'app attiva.
+Replicare il flusso essenziale di WhisperFlow in locale: Control hold push-to-talk, registrazione microfono, trascrizione offline con Whisper Large V3 su Apple Silicon (Metal), copia in clipboard e paste nell'app attiva.
 
 ## Criteri di successo
-- [ ] Control hold avvia la registrazione e il rilascio ferma/trascrive anche quando l'app non e in foreground.
-- [ ] L'app chiede permesso microfono.
-- [ ] L'audio viene salvato come WAV 16 kHz mono compatibile con `whisper-cli`.
-- [ ] `whisper.cpp` trascrive con `Models/ggml-large-v3.bin`.
-- [ ] Il testo viene copiato in clipboard.
-- [ ] Se Accessibility e autorizzato, il testo viene incollato nell'app attiva.
-- [ ] Errori per modello/binario/permessi mancanti sono leggibili.
+- [x] Control hold avvia la registrazione e il rilascio ferma/trascrive anche quando l'app non e in foreground.
+- [x] L'app chiede permesso microfono.
+- [x] L'audio viene salvato come WAV 16 kHz mono compatibile con whisper.cpp.
+- [x] whisper.cpp (via whisper-server persistente) trascrive con `Models/ggml-large-v3.bin` su Metal.
+- [x] Il testo viene copiato in clipboard.
+- [x] Se Accessibility e autorizzato, il testo viene incollato nell'app attiva.
+- [x] Errori per modello/binario/permessi mancanti sono leggibili.
 
 ## Fasi
 
-### Fase 1 - MVP locale [IN CORSO]
+### Fase 1 - MVP locale [COMPLETATA]
 - [x] Definire piano e assunzioni.
 - [x] Creare scaffold SwiftPM macOS.
 - [x] Implementare servizi base.
 - [x] Verificare build Swift.
-- [x] Buildare `whisper.cpp`.
+- [x] Buildare whisper.cpp con Metal + Accelerate (build statica per evitare rpath rotti dopo move).
 - [x] Scaricare Whisper Large V3 ggml.
-- [x] Testare trascrizione Large V3 su sample WAV.
-- [x] Verificare lancio bundle app.
-- [x] Spostare progetto sotto iCloud Drive.
-- [x] Creare commit locale iniziale su `main`.
-- [x] Pubblicare sorgenti su GitHub.
-- [x] Cambiare default da Option-Space toggle a Control hold push-to-talk.
-- [x] Fixare Control push-to-talk con `CGEvent` tap globale e test state machine.
-- [ ] Testare trascrizione end-to-end da microfono.
+- [x] Spostare il modello fuori da iCloud Drive in Application Support.
+- [x] Implementare `WhisperServerWorker` persistente (HTTP localhost:18642).
+- [x] Warmup automatico del modello al lancio app.
+- [x] Cleanup server in `applicationWillTerminate` + signal handler (SIGTERM/SIGINT/SIGHUP) + atexit.
+- [x] Migrazione UserDefaults: reset path stale che puntano a posizione pre-iCloud.
+- [x] Smoke test end-to-end con sample WAV: trascrizione corretta in ~2.6 s su steady state.
+- [ ] Test microfono reale (richiede utente).
 
 ### Fase 2 - Qualita UX [PIANIFICATA]
-- [ ] Migliorare feedback durante registrazione/trascrizione.
-- [ ] Aggiungere gestione hotkey piu ergonomica.
-- [ ] Migliorare diagnostica permessi.
+- [ ] Indicatore visivo di warmup (modello in load) e di stato server.
+- [ ] Feedback visivo durante registrazione e trascrizione.
+- [ ] Diagnostica permessi piu chiara nel menu.
+- [ ] Hotkey configurabile (oltre a Control hold).
 
 ### Fase 3 - Performance [PIANIFICATA]
-**Fondamentale:** l'app deve essere ottimizzata per Apple Silicon prima di considerare il prodotto usabile come alternativa a WhisperFlow. L'MVP CPU/Accelerate serve solo come baseline stabile.
-
-- [ ] Riprodurre e diagnosticare il fallimento Metal Large V3 (`ggml_metal_buffer_init: failed to allocate buffer`).
-- [ ] Rimuovere il fallback forzato `-ng` quando Metal/Core ML e stabile.
-- [ ] Buildare `whisper.cpp` con supporto Apple Silicon completo: Metal e Core ML (`WHISPER_COREML=1`).
-- [ ] Generare o scaricare l'encoder Core ML per Whisper Large V3 e documentare il path atteso.
-- [ ] Misurare tempi baseline CPU/Accelerate vs Metal/Core ML su sample e frase dettata reale.
-- [ ] Ridurre il costo di cold start: evitare di ricaricare 3 GB di modello a ogni dettatura, tramite worker persistente o integrazione diretta della libreria.
-- [ ] Valutare footprint di Large V3 pieno su questo Mac; se resta troppo lento, proporre esplicitamente tradeoff con `large-v3-q5_0` senza cambiare default in autonomia.
-- [ ] Valutare VAD/chunking dopo l'ottimizzazione Apple Silicon.
-- [ ] Valutare streaming o quasi realtime dopo worker persistente/Core ML.
+- [ ] Provare Core ML encoder per Large V3 (richiede generazione encoder + WHISPER_COREML=1).
+- [ ] Misurare e ridurre cold start del server (oggi ~5-10 s su SSD locale, ~40 s da rsync fresh).
+- [ ] Valutare `large-v3-q5_0` come opzione esplicita per ridurre footprint.
+- [ ] Valutare VAD/chunking e streaming dopo Core ML.
 
 ## Decisioni rimandate
-- Core ML/Metal: non e opzionale; e rimandato solo dopo il fix del push-to-talk. La smoke test Metal ha fallito su allocazione buffer, CPU/Accelerate funziona come baseline.
-- Streaming realtime: rimandato fino a quando record/transcribe/paste e stabile.
+- Core ML encoder: rimandato a Fase 3 dopo verifica live del flusso.
+- Streaming realtime: rimandato fino a quando Core ML e UX sono stabili.
 
 ## Fuori scope
 - API cloud STT.

@@ -48,6 +48,13 @@ cat >"$INFO_PLIST" <<PLIST
 </plist>
 PLIST
 
+SIGNING_HASH="$(security find-identity -p codesigning -v 2>/dev/null | awk '/Apple Development:/ {print $2; exit}')"
+if [[ -n "$SIGNING_HASH" ]]; then
+  codesign --force --sign "$SIGNING_HASH" --identifier "$BUNDLE_ID" --timestamp=none "$APP_BUNDLE" >/dev/null 2>&1
+else
+  codesign --force --sign - --identifier "$BUNDLE_ID" --timestamp=none "$APP_BUNDLE" >/dev/null 2>&1
+fi
+
 open_app() {
   /usr/bin/open -n "$APP_BUNDLE"
 }

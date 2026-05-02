@@ -1,30 +1,38 @@
 # MEMORY.md - LocalWhisperFlow
 
 ## Decisioni architetturali
-- [domain] 2026-05-02 Scelto `whisper.cpp` come motore locale invece di Python/faster-whisper per avere una app macOS piu stabile e distribuibile.
-- [domain] 2026-05-02 Scelto Whisper Large V3, non Turbo, per privilegiare accuratezza. Il path modello default e `Models/ggml-large-v3.bin`.
-- [domain] 2026-05-02 Scelto MVP Control hold push-to-talk -> transcribe -> clipboard/paste. Streaming realtime, VAD e Core ML sono rimandati.
-- [domain] 2026-05-02 Il progetto deve vivere sotto iCloud Drive: `/Users/edoardozedda/Library/Mobile Documents/com~apple~CloudDocs/Progetti/LocalWhisperFlow`.
-- [domain] 2026-05-02 Pubblicato repo privato GitHub `zeddaedoardo-byte/LocalWhisperFlow`. Il modello Large V3 e `external/whisper.cpp` restano locali e ignorati da Git.
-- [domain] 2026-05-02 L'ottimizzazione Apple Silicon e fondamentale: CPU/Accelerate con `-ng` e solo baseline stabile, non stato finale. Priorita: Metal/Core ML, poi worker persistente per evitare reload del modello a ogni dettatura.
+- [domain] 2026-05-02 Scelto whisper.cpp come motore locale invece di Python/faster-whisper per stabilita e distribuibilita.
+- [domain] 2026-05-02 Scelto Whisper Large V3 (non Turbo) per accuratezza. Path default modello: `~/Library/Application Support/LocalWhisperFlow/Models/ggml-large-v3.bin`.
+- [domain] 2026-05-02 Scelto MVP Control hold push-to-talk → transcribe → clipboard/paste. Streaming realtime, VAD e Core ML rimandati.
+- [domain] 2026-05-02 Progetto vive sotto iCloud Drive: `/Users/edoardozedda/Library/Mobile Documents/com~apple~CloudDocs/Progetti/LocalWhisperFlow`. Il MODELLO invece NON deve stare in iCloud (vedi gotcha sotto).
+- [domain] 2026-05-02 Architettura runtime: `whisper-server` persistente come child process del bundle. App parla via HTTP `127.0.0.1:18642`. Modello caricato una sola volta al warmup; ogni dictation successiva ~2.6 s su M3 con Metal + Accelerate per audio 11 s.
+- [domain] 2026-05-02 whisper.cpp viene buildato STATICO (`-DBUILD_SHARED_LIBS=OFF`) con `-DGGML_METAL=ON -DGGML_METAL_EMBED_LIBRARY=ON -DGGML_ACCELERATE=ON -DGGML_BLAS=ON -DGGML_BLAS_VENDOR=Apple`. Eseguibili autocontenuti, non si rompono se la cartella viene spostata.
 
 ## Gotchas e comportamenti non ovvi
-- [domain] macOS: Microfono richiede `NSMicrophoneUsageDescription` nel bundle `.app`, quindi il run script genera un `Info.plist` esplicito.
+- [domain] iCloud Drive + 3 GB model = morte: il primo mmap del modello tagged iCloud puo richiedere 200+ s (lazy load di pagine). Soluzione: tenere il modello in `~/Library/Application Support/LocalWhisperFlow/Models/`. Cold load locale ~5-10 s.
+- [domain] Build whisper.cpp NON statica = rpath assoluto al path della build. Se la cartella viene spostata, `whisper-cli` cerca `libwhisper.1.dylib` al vecchio path e crasha con `dyld: Library not loaded`. Build statica risolve.
+- [domain] `Process` con `Pipe` su stdout NON drenata blocca il child quando il buffer pipe (~64 KB) si riempie. whisper-server scrive molto a stdout in init: bisogna installare un `readabilityHandler` no-op anche su stdout, oltre che su stderr.
+- [domain] `applicationWillTerminate` non viene chiamato se il processo riceve SIGTERM diretto (es. `pkill`). Per cleanup server affidabile servono signal handler espliciti (SIGTERM/SIGINT/SIGHUP) + `atexit` come backstop.
+- [domain] UserDefaults possono contenere path obsoleti da run precedenti (es. binario whisper a vecchia posizione pre-iCloud). `SettingsStore.init` deve verificare che il path stored sia ancora valido (FileManager) e ricadere sul default altrimenti, salvando il nuovo valore.
+- [domain] macOS: Microfono richiede `NSMicrophoneUsageDescription` nel bundle `.app`. Il run script genera Info.plist esplicito.
 - [domain] macOS: Auto-paste via eventi tastiera richiede Accessibility. Senza permesso il testo resta in clipboard.
-- [domain] macOS: Control hold push-to-talk globale usa un `CGEvent` tap `flagsChanged`, non `NSEvent.addGlobalMonitorForEvents`, e richiede Accessibility per funzionare fuori dall'app.
-- [domain] UX: Un fallimento di auto-paste non deve marcare la trascrizione come fallita; mostra warning ma lascia stato completed e testo in clipboard.
+- [domain] macOS: Control hold push-to-talk globale usa `CGEvent` tap `flagsChanged`, non `NSEvent.addGlobalMonitorForEvents`. Richiede Accessibility per funzionare fuori dall'app.
+- [domain] UX: Un fallimento di auto-paste non deve marcare la trascrizione come fallita; mostra warning ma lascia stato `completed` e testo in clipboard.
 - [domain] UX: La release di Control puo arrivare mentre `AVAudioRecorder` sta ancora partendo; `AppState` traccia `isPushToTalkHeld` e ferma/trascrive appena la registrazione diventa attiva.
-- [domain] whisper.cpp: `whisper-cli` richiede WAV 16-bit; `AudioRecorderService` registra direttamente WAV PCM 16 kHz mono.
-- [domain] whisper.cpp: su questo Mac la smoke test Large V3 con Metal ha fallito con `ggml_metal_buffer_init: failed to allocate buffer`. L'MVP passa `-ng` a `whisper-cli` e usa CPU/Accelerate.
-- [domain] SwiftPM: `.build` dentro iCloud Drive puo fallire con "input file was modified during the build"; il run script usa `/private/tmp/local-whisperflow-swiftpm-build`.
+- [domain] whisper.cpp: `whisper-cli`/`whisper-server` accettano WAV 16-bit. `AudioRecorderService` registra direttamente WAV PCM 16 kHz mono.
+- [domain] SwiftPM: `.build` dentro iCloud Drive puo dare `input file was modified during the build`. Run script usa `/private/tmp/local-whisperflow-swiftpm-build`.
+- [domain] iCloud Drive puo bloccare temporaneamente la lettura di un file appena scritto (race con sync). Se un Read/Edit fallisce con timeout, attendere qualche secondo e riprovare.
 
 ## Conoscenza procedurale
-- [procedural] Setup locale: eseguire `./script/setup_whisper_cpp.sh`, poi `./script/build_and_run.sh`.
-- [procedural] I build artifact e modelli sono ignorati da Git: `external/`, `.build/`, `dist/`, `Models/*.bin`. SwiftPM build manuale: `swift build --scratch-path /private/tmp/local-whisperflow-swiftpm-build`.
-- [procedural] Test push-to-talk: `swift test --scratch-path /private/tmp/local-whisperflow-swiftpm-build`.
-- [procedural] GitHub non deve includere `Models/ggml-large-v3.bin` perche pesa circa 2.9 GiB e supera i limiti pratici di GitHub standard.
+- [procedural] Setup locale: `./script/setup_whisper_cpp.sh` — clona whisper.cpp, build statica con Metal, scarica Large V3 in Application Support.
+- [procedural] Build e run app: `./script/build_and_run.sh`. Modalita: `run` default, `--verify`, `--logs`, `--telemetry`, `--debug`.
+- [procedural] Test: `swift test --scratch-path /private/tmp/local-whisperflow-swiftpm-build`.
+- [procedural] Debug server: ping `curl http://127.0.0.1:18642/` per ready, POST multipart `/inference` con campo `file`, `language`, `response_format=text`.
+- [procedural] Cleanup orfani server in dev: `pkill -f whisper-server`.
+- [procedural] I build artifact e modelli sono ignorati da Git: `external/`, `.build/`, `dist/`, `Models/*.bin`.
+- [procedural] GitHub non deve includere `Models/*.bin` (Large V3 ~2.9 GiB).
 
 ## Stato corrente (aggiornato ogni sessione)
 - Ultima sessione: 2026-05-02
-- Cosa e stato fatto: scaffold SwiftPM, servizi principali, run script, setup script, COMP iniziale, build Swift, build whisper.cpp, download Large V3, smoke test CPU/no-GPU, bundle app verificato con `./script/build_and_run.sh --verify`, progetto spostato interamente sotto iCloud Drive, repo GitHub privato creato e push iniziale completato, default cambiato a Control hold push-to-talk, fixato push-to-talk con `CGEvent` tap e test state machine.
-- Blocchi aperti: ottimizzazione Apple Silicon fondamentale ancora da implementare; test hotkey/microfono/paste manuale ancora da verificare.
+- Cosa e stato fatto: pipeline end-to-end resa funzionante. Rebuild whisper.cpp statico con Metal+Accelerate (fix rpath rotto dopo move iCloud). Modello spostato fuori iCloud in Application Support (fix lazy-load 200 s). Sostituito spawn-per-dictation con `WhisperServerWorker` persistente. Aggiunto warmup automatico. Aggiunti signal handler + atexit per cleanup server. Migrazione UserDefaults stale. Smoke test: ready 2-40 s, inference 2.6 s su 11 s audio.
+- Blocchi aperti: verifica live con microfono reale + auto-paste in app concreta richiede l'utente.

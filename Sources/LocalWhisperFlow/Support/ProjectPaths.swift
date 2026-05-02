@@ -13,7 +13,25 @@ enum ProjectPaths {
         return URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
     }
 
+    static var applicationSupportRoot: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support")
+        return base.appendingPathComponent("LocalWhisperFlow", isDirectory: true)
+    }
+
+    static var applicationSupportModelsDir: URL {
+        applicationSupportRoot.appendingPathComponent("Models", isDirectory: true)
+    }
+
     static var defaultModelURL: URL {
-        projectRoot.appendingPathComponent("Models/ggml-large-v3.bin")
+        let asURL = applicationSupportModelsDir.appendingPathComponent("ggml-large-v3.bin")
+        if FileManager.default.fileExists(atPath: asURL.path) {
+            return asURL
+        }
+        let projectURL = projectRoot.appendingPathComponent("Models/ggml-large-v3.bin")
+        if FileManager.default.fileExists(atPath: projectURL.path) {
+            return projectURL
+        }
+        return asURL
     }
 }

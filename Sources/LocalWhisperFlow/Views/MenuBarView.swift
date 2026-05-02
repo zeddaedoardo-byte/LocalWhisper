@@ -10,10 +10,33 @@ struct MenuBarView: View {
             Text(appState.status.title)
                 .font(.headline)
 
-            Text("Model: Whisper Large V3")
+            Text("Model: Whisper Large V3 (Metal)")
                 .foregroundStyle(.secondary)
 
-            Text("Hold Control to record")
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(appState.isServerReady ? Color.green : (appState.isWarmingUp ? Color.orange : Color.gray))
+                    .frame(width: 8, height: 8)
+                Text(appState.isServerReady ? "Server ready" : (appState.isWarmingUp ? "Warming up..." : "Server stopped"))
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(appState.hasAccessibility ? Color.green : Color.red)
+                    .frame(width: 8, height: 8)
+                Text(appState.hasAccessibility ? "Accessibility OK" : "Accessibility missing")
+                    .foregroundStyle(.secondary)
+            }
+
+            Text("Hold \(PushToTalkTrigger.byID(settings.pushToTalkTriggerID).label) to record")
+                .foregroundStyle(.secondary)
+
+            Text("Tap events: \(appState.tapEventsReceived)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(String(format: "Flags: 0x%08llx  kc:%d", appState.lastTapFlags, appState.lastTapKeycode))
+                .font(.caption2)
                 .foregroundStyle(.secondary)
 
             if !appState.lastTranscript.isEmpty {
@@ -38,9 +61,11 @@ struct MenuBarView: View {
 
             Toggle("Auto Paste", isOn: $settings.autoPaste)
 
-            Button("Request Accessibility Permission") {
-                appState.requestAccessibilityPermission()
-                appState.resetPushToTalk()
+            if !appState.hasAccessibility {
+                Button("Grant Accessibility...") {
+                    appState.requestAccessibilityPermission()
+                    openAccessibilitySettings()
+                }
             }
 
             SettingsLink {
@@ -56,5 +81,11 @@ struct MenuBarView: View {
         }
         .frame(width: 280)
         .padding(.vertical, 6)
+    }
+
+    private func openAccessibilitySettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
     }
 }
