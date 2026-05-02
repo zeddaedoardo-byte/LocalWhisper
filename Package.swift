@@ -11,6 +11,10 @@ let package = Package(
         .executable(name: "LocalWhisperFlow", targets: ["LocalWhisperFlow"])
     ],
     targets: [
-        .executableTarget(name: "LocalWhisperFlow")
+        .executableTarget(name: "LocalWhisperFlow"),
+        .testTarget(
+            name: "LocalWhisperFlowTests",
+            dependencies: ["LocalWhisperFlow"]
+        )
     ]
 )

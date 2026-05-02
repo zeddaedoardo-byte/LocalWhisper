@@ -16,12 +16,16 @@
 
 # Solo build Swift
 swift build --scratch-path /private/tmp/local-whisperflow-swiftpm-build
+
+# Test
+swift test --scratch-path /private/tmp/local-whisperflow-swiftpm-build
 ```
 
 ## Regole specifiche del progetto
 - Non integrare API cloud per STT: il prodotto deve restare locale/offline.
 - Non sostituire Large V3 con Turbo senza richiesta esplicita.
 - Il flusso MVP resta Control hold push-to-talk -> transcribe -> clipboard/paste. Streaming realtime e VAD sono fase successiva.
+- Control push-to-talk usa un `CGEvent` tap globale; non tornare a `NSEvent.addGlobalMonitorForEvents` per modifier-only globali senza una verifica reale.
 - Non usare la `.build` dentro iCloud Drive per SwiftPM; usa `--scratch-path /private/tmp/local-whisperflow-swiftpm-build`.
 - Non tracciare modelli `.bin` o build di `external/whisper.cpp` in Git.
 

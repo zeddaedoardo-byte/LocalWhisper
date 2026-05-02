@@ -10,8 +10,9 @@
 ## Gotchas e comportamenti non ovvi
 - [domain] macOS: Microfono richiede `NSMicrophoneUsageDescription` nel bundle `.app`, quindi il run script genera un `Info.plist` esplicito.
 - [domain] macOS: Auto-paste via eventi tastiera richiede Accessibility. Senza permesso il testo resta in clipboard.
-- [domain] macOS: Control hold push-to-talk globale usa `NSEvent` flagsChanged monitor e richiede Accessibility per funzionare fuori dall'app.
+- [domain] macOS: Control hold push-to-talk globale usa un `CGEvent` tap `flagsChanged`, non `NSEvent.addGlobalMonitorForEvents`, e richiede Accessibility per funzionare fuori dall'app.
 - [domain] UX: Un fallimento di auto-paste non deve marcare la trascrizione come fallita; mostra warning ma lascia stato completed e testo in clipboard.
+- [domain] UX: La release di Control puo arrivare mentre `AVAudioRecorder` sta ancora partendo; `AppState` traccia `isPushToTalkHeld` e ferma/trascrive appena la registrazione diventa attiva.
 - [domain] whisper.cpp: `whisper-cli` richiede WAV 16-bit; `AudioRecorderService` registra direttamente WAV PCM 16 kHz mono.
 - [domain] whisper.cpp: su questo Mac la smoke test Large V3 con Metal ha fallito con `ggml_metal_buffer_init: failed to allocate buffer`. L'MVP passa `-ng` a `whisper-cli` e usa CPU/Accelerate.
 - [domain] SwiftPM: `.build` dentro iCloud Drive puo fallire con "input file was modified during the build"; il run script usa `/private/tmp/local-whisperflow-swiftpm-build`.
@@ -19,9 +20,10 @@
 ## Conoscenza procedurale
 - [procedural] Setup locale: eseguire `./script/setup_whisper_cpp.sh`, poi `./script/build_and_run.sh`.
 - [procedural] I build artifact e modelli sono ignorati da Git: `external/`, `.build/`, `dist/`, `Models/*.bin`. SwiftPM build manuale: `swift build --scratch-path /private/tmp/local-whisperflow-swiftpm-build`.
+- [procedural] Test push-to-talk: `swift test --scratch-path /private/tmp/local-whisperflow-swiftpm-build`.
 - [procedural] GitHub non deve includere `Models/ggml-large-v3.bin` perche pesa circa 2.9 GiB e supera i limiti pratici di GitHub standard.
 
 ## Stato corrente (aggiornato ogni sessione)
 - Ultima sessione: 2026-05-02
-- Cosa e stato fatto: scaffold SwiftPM, servizi principali, run script, setup script, COMP iniziale, build Swift, build whisper.cpp, download Large V3, smoke test CPU/no-GPU, bundle app verificato con `./script/build_and_run.sh --verify`, progetto spostato interamente sotto iCloud Drive, repo GitHub privato creato e push iniziale completato, default cambiato a Control hold push-to-talk.
+- Cosa e stato fatto: scaffold SwiftPM, servizi principali, run script, setup script, COMP iniziale, build Swift, build whisper.cpp, download Large V3, smoke test CPU/no-GPU, bundle app verificato con `./script/build_and_run.sh --verify`, progetto spostato interamente sotto iCloud Drive, repo GitHub privato creato e push iniziale completato, default cambiato a Control hold push-to-talk, fixato push-to-talk con `CGEvent` tap e test state machine.
 - Blocchi aperti: test hotkey/microfono/paste manuale ancora da verificare.

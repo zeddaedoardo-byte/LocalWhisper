@@ -40,9 +40,16 @@ Hold Control to record. Release Control to stop and transcribe.
 
 The run script builds SwiftPM artifacts under `/private/tmp/local-whisperflow-swiftpm-build` so iCloud Drive does not sync compiler output while Swift is linking.
 
+## Test
+
+```bash
+swift test --scratch-path /private/tmp/local-whisperflow-swiftpm-build
+```
+
 ## Notes
 
 - The app uses `whisper-cli -ng` by default because the first Large V3 smoke test on this Mac failed with a Metal allocation error.
 - CPU/Accelerate transcription is verified and works offline.
 - Auto-paste failures do not discard the transcript; text remains in the clipboard.
 - Global Control push-to-talk requires Accessibility permission.
+- Control push-to-talk uses a global `CGEvent` tap so modifier-only press/release is captured reliably.

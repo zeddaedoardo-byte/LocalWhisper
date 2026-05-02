@@ -12,6 +12,8 @@ final class AppState: ObservableObject {
     private let clipboardService = ClipboardService()
     private let pasteService = PasteService()
     private let pushToTalkService = PushToTalkService()
+    private var isPushToTalkHeld = false
+    private var isStartingPushToTalkRecording = false
 
     init(settings: SettingsStore) {
         self.settings = settings
@@ -29,30 +31,46 @@ final class AppState: ObservableObject {
     }
 
     func startPushToTalk() {
-        if !hasAccessibilityPermission() {
-            _ = pasteService.requestAccessibilityPermission()
-            lastError = "Accessibility permission is required for Control push-to-talk and auto-paste."
-        }
-
-        pushToTalkService.start { [weak self] in
-            Task { @MainActor in
-                self?.beginPushToTalkRecording()
+        do {
+            try pushToTalkService.start { [weak self] in
+                Task { @MainActor in
+                    self?.beginPushToTalkRecording()
+                }
+            } onRelease: { [weak self] in
+                Task { @MainActor in
+                    self?.endPushToTalkRecording()
+                }
             }
-        } onRelease: { [weak self] in
-            Task { @MainActor in
-                self?.endPushToTalkRecording()
-            }
+        } catch {
+            lastError = error.localizedDescription
         }
     }
 
     private func beginPushToTalkRecording() {
-        guard status != .recording, status.canToggleRecording else { return }
-        Task { await startRecording() }
+        guard status != .recording,
+              status.canToggleRecording,
+              !isStartingPushToTalkRecording else { return }
+
+        isPushToTalkHeld = true
+        isStartingPushToTalkRecording = true
+
+        Task { @MainActor in
+            await startRecording()
+            isStartingPushToTalkRecording = false
+
+            if !isPushToTalkHeld, status == .recording {
+                await stopAndTranscribe()
+            }
+        }
     }
 
     private func endPushToTalkRecording() {
-        guard status == .recording else { return }
-        Task { await stopAndTranscribe() }
+        guard isPushToTalkHeld else { return }
+        isPushToTalkHeld = false
+
+        if status == .recording {
+            Task { await stopAndTranscribe() }
+        }
     }
 
     func resetPushToTalk() {

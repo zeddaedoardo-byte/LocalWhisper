@@ -36,6 +36,7 @@ Replicare il flusso essenziale di WhisperFlow in locale: Control hold push-to-ta
 - [x] Creare commit locale iniziale su `main`.
 - [x] Pubblicare sorgenti su GitHub.
 - [x] Cambiare default da Option-Space toggle a Control hold push-to-talk.
+- [x] Fixare Control push-to-talk con `CGEvent` tap globale e test state machine.
 - [ ] Testare trascrizione end-to-end da microfono.
 
 ### Fase 2 - Qualita UX [PIANIFICATA]
