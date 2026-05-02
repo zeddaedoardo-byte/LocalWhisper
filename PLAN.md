@@ -4,8 +4,8 @@
 *Aggiornato: 2026-05-02*
 
 **Cosa e attivo ora:** MVP app menu bar locale con Whisper Large V3, ora sotto iCloud Drive.
-**Blocchi:** GitHub CLI ha token invalido; test hotkey, microfono e auto-paste richiedono interazione utente/macOS permissions.
-**Prossima cosa da fare:** rifare `gh auth login`, pushare repo, poi concedere permessi e provare Option-Space in una chat/test editor.
+**Blocchi:** test hotkey, microfono e auto-paste richiedono interazione utente/macOS permissions.
+**Prossima cosa da fare:** concedere permessi e provare Option-Space in una chat/test editor.
 
 ---
 
@@ -34,7 +34,7 @@ Replicare il flusso essenziale di WhisperFlow in locale: hotkey globale, registr
 - [x] Verificare lancio bundle app.
 - [x] Spostare progetto sotto iCloud Drive.
 - [x] Creare commit locale iniziale su `main`.
-- [ ] Pubblicare sorgenti su GitHub.
+- [x] Pubblicare sorgenti su GitHub.
 - [ ] Testare trascrizione end-to-end da microfono.
 
 ### Fase 2 - Qualita UX [PIANIFICATA]

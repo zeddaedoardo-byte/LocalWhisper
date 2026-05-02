@@ -22,4 +22,5 @@ La UI SwiftUI e solo un controllo sottile sopra servizi platform separati. `AppS
 - Il backend Metal ha fallito nella prima smoke test Large V3 su questo Mac; l'app usa `whisper-cli -ng` per affidabilita.
 
 ## Link chiave
+- Repository: https://github.com/zeddaedoardo-byte/LocalWhisperFlow
 - whisper.cpp: https://github.com/ggerganov/whisper.cpp
