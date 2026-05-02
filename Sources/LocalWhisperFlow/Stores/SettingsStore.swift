@@ -6,8 +6,6 @@ final class SettingsStore: ObservableObject {
         static let modelPath = "modelPath"
         static let language = "language"
         static let autoPaste = "autoPaste"
-        static let hotkeyKeyCode = "hotkeyKeyCode"
-        static let hotkeyModifiers = "hotkeyModifiers"
     }
 
     private let defaults: UserDefaults
@@ -28,14 +26,6 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(autoPaste, forKey: Keys.autoPaste) }
     }
 
-    @Published var hotkeyKeyCode: Int {
-        didSet { defaults.set(hotkeyKeyCode, forKey: Keys.hotkeyKeyCode) }
-    }
-
-    @Published var hotkeyModifiers: Int {
-        didSet { defaults.set(hotkeyModifiers, forKey: Keys.hotkeyModifiers) }
-    }
-
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         self.whisperBinaryPath = defaults.string(forKey: Keys.whisperBinaryPath)
@@ -44,27 +34,11 @@ final class SettingsStore: ObservableObject {
             ?? ProjectPaths.defaultModelURL.path
         self.language = defaults.string(forKey: Keys.language) ?? "it"
         self.autoPaste = defaults.object(forKey: Keys.autoPaste) as? Bool ?? true
-        self.hotkeyKeyCode = defaults.object(forKey: Keys.hotkeyKeyCode) as? Int
-            ?? HotkeyDefaults.spaceKeyCode
-        self.hotkeyModifiers = defaults.object(forKey: Keys.hotkeyModifiers) as? Int
-            ?? HotkeyDefaults.optionModifier
     }
 
     func resetDefaultPaths() {
         whisperBinaryPath = SettingsStore.defaultWhisperBinaryPath()
         modelPath = ProjectPaths.defaultModelURL.path
-    }
-
-    func hasHotkeyModifier(_ modifier: Int) -> Bool {
-        (hotkeyModifiers & modifier) == modifier
-    }
-
-    func setHotkeyModifier(_ modifier: Int, enabled: Bool) {
-        if enabled {
-            hotkeyModifiers = hotkeyModifiers | modifier
-        } else {
-            hotkeyModifiers = hotkeyModifiers & ~modifier
-        }
     }
 
     private static func defaultWhisperBinaryPath() -> String {

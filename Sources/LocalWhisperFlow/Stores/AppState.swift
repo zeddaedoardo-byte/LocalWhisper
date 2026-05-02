@@ -11,11 +11,11 @@ final class AppState: ObservableObject {
     private let whisperService = WhisperService()
     private let clipboardService = ClipboardService()
     private let pasteService = PasteService()
-    private let hotkeyService = HotkeyService()
+    private let pushToTalkService = PushToTalkService()
 
     init(settings: SettingsStore) {
         self.settings = settings
-        registerHotkey()
+        startPushToTalk()
     }
 
     func toggleRecording() {
@@ -28,20 +28,36 @@ final class AppState: ObservableObject {
         }
     }
 
-    func registerHotkey() {
-        do {
-            try hotkeyService.register(
-                keyCode: UInt32(settings.hotkeyKeyCode),
-                modifiers: UInt32(settings.hotkeyModifiers)
-            ) { [weak self] in
-                Task { @MainActor in
-                    self?.toggleRecording()
-                }
-            }
-        } catch {
-            lastError = error.localizedDescription
-            status = .failed(error.localizedDescription)
+    func startPushToTalk() {
+        if !hasAccessibilityPermission() {
+            _ = pasteService.requestAccessibilityPermission()
+            lastError = "Accessibility permission is required for Control push-to-talk and auto-paste."
         }
+
+        pushToTalkService.start { [weak self] in
+            Task { @MainActor in
+                self?.beginPushToTalkRecording()
+            }
+        } onRelease: { [weak self] in
+            Task { @MainActor in
+                self?.endPushToTalkRecording()
+            }
+        }
+    }
+
+    private func beginPushToTalkRecording() {
+        guard status != .recording, status.canToggleRecording else { return }
+        Task { await startRecording() }
+    }
+
+    private func endPushToTalkRecording() {
+        guard status == .recording else { return }
+        Task { await stopAndTranscribe() }
+    }
+
+    func resetPushToTalk() {
+        pushToTalkService.stop()
+        startPushToTalk()
     }
 
     func requestAccessibilityPermission() {

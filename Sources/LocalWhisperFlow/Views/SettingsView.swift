@@ -38,43 +38,19 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Global Hotkey") {
-                HStack {
-                    Toggle("Command", isOn: modifierBinding(HotkeyDefaults.commandModifier))
-                    Toggle("Option", isOn: modifierBinding(HotkeyDefaults.optionModifier))
-                    Toggle("Control", isOn: modifierBinding(HotkeyDefaults.controlModifier))
-                    Toggle("Shift", isOn: modifierBinding(HotkeyDefaults.shiftModifier))
-                }
-
-                Stepper("Key code: \(settings.hotkeyKeyCode)", value: $settings.hotkeyKeyCode, in: 0...127)
-
-                HStack {
-                    Button("Apply Hotkey") {
-                        appState.registerHotkey()
-                    }
-
-                    Button("Reset Option-Space") {
-                        settings.hotkeyModifiers = HotkeyDefaults.optionModifier
-                        settings.hotkeyKeyCode = HotkeyDefaults.spaceKeyCode
-                        appState.registerHotkey()
-                    }
-                }
-
-                Text("Default: Option-Space. Space key code is 49.")
+            Section("Push-to-Talk") {
+                Text("Default: hold Control to record, release Control to transcribe.")
                     .foregroundStyle(.secondary)
+
+                Button("Request Accessibility Permission") {
+                    appState.requestAccessibilityPermission()
+                    appState.resetPushToTalk()
+                }
             }
         }
         .formStyle(.grouped)
         .padding(20)
         .frame(width: 620, height: 500)
-    }
-
-    private func modifierBinding(_ modifier: Int) -> Binding<Bool> {
-        Binding {
-            settings.hasHotkeyModifier(modifier)
-        } set: { enabled in
-            settings.setHotkeyModifier(modifier, enabled: enabled)
-        }
     }
 }
 

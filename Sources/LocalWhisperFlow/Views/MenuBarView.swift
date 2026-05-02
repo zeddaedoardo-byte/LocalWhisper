@@ -13,6 +13,9 @@ struct MenuBarView: View {
             Text("Model: Whisper Large V3")
                 .foregroundStyle(.secondary)
 
+            Text("Hold Control to record")
+                .foregroundStyle(.secondary)
+
             if !appState.lastTranscript.isEmpty {
                 Divider()
                 Text(appState.lastTranscript)
@@ -37,6 +40,7 @@ struct MenuBarView: View {
 
             Button("Request Accessibility Permission") {
                 appState.requestAccessibilityPermission()
+                appState.resetPushToTalk()
             }
 
             SettingsLink {

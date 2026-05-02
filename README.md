@@ -1,6 +1,6 @@
 # LocalWhisperFlow
 
-LocalWhisperFlow is a local macOS menu bar dictation app inspired by WhisperFlow. It records microphone audio with a global hotkey, transcribes it offline with `whisper.cpp` and Whisper Large V3, then copies the transcript to the clipboard and optionally pastes it into the active app.
+LocalWhisperFlow is a local macOS menu bar dictation app inspired by WhisperFlow. It records microphone audio with Control push-to-talk, transcribes it offline with `whisper.cpp` and Whisper Large V3, then copies the transcript to the clipboard and optionally pastes it into the active app.
 
 ## Requirements
 
@@ -8,7 +8,7 @@ LocalWhisperFlow is a local macOS menu bar dictation app inspired by WhisperFlow
 - Xcode command line tools / Swift toolchain
 - Homebrew `cmake` for building `whisper.cpp`
 - Microphone permission
-- Accessibility permission for auto-paste
+- Accessibility permission for Control push-to-talk and auto-paste
 
 ## Setup
 
@@ -30,16 +30,19 @@ The model is about 2.9 GiB and is intentionally not committed to Git.
 ./script/build_and_run.sh
 ```
 
-The app runs as a menu bar app. Default hotkey:
+The app runs as a menu bar app. Default input:
 
 ```text
-Option-Space
+Hold Control
 ```
 
-Press once to start recording, press again to stop and transcribe.
+Hold Control to record. Release Control to stop and transcribe.
+
+The run script builds SwiftPM artifacts under `/private/tmp/local-whisperflow-swiftpm-build` so iCloud Drive does not sync compiler output while Swift is linking.
 
 ## Notes
 
 - The app uses `whisper-cli -ng` by default because the first Large V3 smoke test on this Mac failed with a Metal allocation error.
 - CPU/Accelerate transcription is verified and works offline.
 - Auto-paste failures do not discard the transcript; text remains in the clipboard.
+- Global Control push-to-talk requires Accessibility permission.

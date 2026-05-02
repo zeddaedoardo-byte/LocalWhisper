@@ -3,17 +3,17 @@
 ## Stato Corrente
 *Aggiornato: 2026-05-02*
 
-**Cosa e attivo ora:** MVP app menu bar locale con Whisper Large V3, ora sotto iCloud Drive.
+**Cosa e attivo ora:** MVP app menu bar locale con Whisper Large V3 e Control hold push-to-talk, ora sotto iCloud Drive.
 **Blocchi:** test hotkey, microfono e auto-paste richiedono interazione utente/macOS permissions.
-**Prossima cosa da fare:** concedere permessi e provare Option-Space in una chat/test editor.
+**Prossima cosa da fare:** concedere permessi e provare Control hold in una chat/test editor.
 
 ---
 
 ## Obiettivo
-Replicare il flusso essenziale di WhisperFlow in locale: hotkey globale, registrazione microfono, trascrizione offline con Whisper Large V3, copia in clipboard e paste nell'app attiva.
+Replicare il flusso essenziale di WhisperFlow in locale: Control hold push-to-talk, registrazione microfono, trascrizione offline con Whisper Large V3, copia in clipboard e paste nell'app attiva.
 
 ## Criteri di successo
-- [ ] Hotkey globale avvia e ferma la registrazione anche quando l'app non e in foreground.
+- [ ] Control hold avvia la registrazione e il rilascio ferma/trascrive anche quando l'app non e in foreground.
 - [ ] L'app chiede permesso microfono.
 - [ ] L'audio viene salvato come WAV 16 kHz mono compatibile con `whisper-cli`.
 - [ ] `whisper.cpp` trascrive con `Models/ggml-large-v3.bin`.
@@ -35,6 +35,7 @@ Replicare il flusso essenziale di WhisperFlow in locale: hotkey globale, registr
 - [x] Spostare progetto sotto iCloud Drive.
 - [x] Creare commit locale iniziale su `main`.
 - [x] Pubblicare sorgenti su GitHub.
+- [x] Cambiare default da Option-Space toggle a Control hold push-to-talk.
 - [ ] Testare trascrizione end-to-end da microfono.
 
 ### Fase 2 - Qualita UX [PIANIFICATA]

@@ -7,6 +7,7 @@ BUNDLE_ID="com.local.LocalWhisperFlow"
 MIN_SYSTEM_VERSION="14.0"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SWIFT_BUILD_DIR="/private/tmp/local-whisperflow-swiftpm-build"
 DIST_DIR="$ROOT_DIR/dist"
 APP_BUNDLE="$DIST_DIR/$APP_NAME.app"
 APP_CONTENTS="$APP_BUNDLE/Contents"
@@ -16,8 +17,8 @@ INFO_PLIST="$APP_CONTENTS/Info.plist"
 
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 
-swift build
-BUILD_BINARY="$(swift build --show-bin-path)/$APP_NAME"
+swift build --scratch-path "$SWIFT_BUILD_DIR"
+BUILD_BINARY="$(swift build --scratch-path "$SWIFT_BUILD_DIR" --show-bin-path)/$APP_NAME"
 
 rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_MACOS"
