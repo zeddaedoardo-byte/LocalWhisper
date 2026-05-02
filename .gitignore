@@ -1,0 +1,8 @@
+.DS_Store
+.build/
+dist/
+external/
+Models/*.bin
+Models/*.mlmodelc
+*.wav
+*.txt
