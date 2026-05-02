@@ -6,6 +6,7 @@
 - [domain] 2026-05-02 Scelto MVP Control hold push-to-talk -> transcribe -> clipboard/paste. Streaming realtime, VAD e Core ML sono rimandati.
 - [domain] 2026-05-02 Il progetto deve vivere sotto iCloud Drive: `/Users/edoardozedda/Library/Mobile Documents/com~apple~CloudDocs/Progetti/LocalWhisperFlow`.
 - [domain] 2026-05-02 Pubblicato repo privato GitHub `zeddaedoardo-byte/LocalWhisperFlow`. Il modello Large V3 e `external/whisper.cpp` restano locali e ignorati da Git.
+- [domain] 2026-05-02 L'ottimizzazione Apple Silicon e fondamentale: CPU/Accelerate con `-ng` e solo baseline stabile, non stato finale. Priorita: Metal/Core ML, poi worker persistente per evitare reload del modello a ogni dettatura.
 
 ## Gotchas e comportamenti non ovvi
 - [domain] macOS: Microfono richiede `NSMicrophoneUsageDescription` nel bundle `.app`, quindi il run script genera un `Info.plist` esplicito.
@@ -26,4 +27,4 @@
 ## Stato corrente (aggiornato ogni sessione)
 - Ultima sessione: 2026-05-02
 - Cosa e stato fatto: scaffold SwiftPM, servizi principali, run script, setup script, COMP iniziale, build Swift, build whisper.cpp, download Large V3, smoke test CPU/no-GPU, bundle app verificato con `./script/build_and_run.sh --verify`, progetto spostato interamente sotto iCloud Drive, repo GitHub privato creato e push iniziale completato, default cambiato a Control hold push-to-talk, fixato push-to-talk con `CGEvent` tap e test state machine.
-- Blocchi aperti: test hotkey/microfono/paste manuale ancora da verificare.
+- Blocchi aperti: ottimizzazione Apple Silicon fondamentale ancora da implementare; test hotkey/microfono/paste manuale ancora da verificare.

@@ -5,7 +5,7 @@
 
 **Cosa e attivo ora:** MVP app menu bar locale con Whisper Large V3 e Control hold push-to-talk, ora sotto iCloud Drive.
 **Blocchi:** test hotkey, microfono e auto-paste richiedono interazione utente/macOS permissions.
-**Prossima cosa da fare:** concedere permessi e provare Control hold in una chat/test editor.
+**Prossima cosa da fare:** ottimizzare per Apple Silicon, poi concedere permessi e provare Control hold in una chat/test editor.
 
 ---
 
@@ -45,12 +45,20 @@ Replicare il flusso essenziale di WhisperFlow in locale: Control hold push-to-ta
 - [ ] Migliorare diagnostica permessi.
 
 ### Fase 3 - Performance [PIANIFICATA]
-- [ ] Valutare Core ML encoder per Apple Silicon.
-- [ ] Valutare VAD/chunking.
-- [ ] Valutare streaming o quasi realtime.
+**Fondamentale:** l'app deve essere ottimizzata per Apple Silicon prima di considerare il prodotto usabile come alternativa a WhisperFlow. L'MVP CPU/Accelerate serve solo come baseline stabile.
+
+- [ ] Riprodurre e diagnosticare il fallimento Metal Large V3 (`ggml_metal_buffer_init: failed to allocate buffer`).
+- [ ] Rimuovere il fallback forzato `-ng` quando Metal/Core ML e stabile.
+- [ ] Buildare `whisper.cpp` con supporto Apple Silicon completo: Metal e Core ML (`WHISPER_COREML=1`).
+- [ ] Generare o scaricare l'encoder Core ML per Whisper Large V3 e documentare il path atteso.
+- [ ] Misurare tempi baseline CPU/Accelerate vs Metal/Core ML su sample e frase dettata reale.
+- [ ] Ridurre il costo di cold start: evitare di ricaricare 3 GB di modello a ogni dettatura, tramite worker persistente o integrazione diretta della libreria.
+- [ ] Valutare footprint di Large V3 pieno su questo Mac; se resta troppo lento, proporre esplicitamente tradeoff con `large-v3-q5_0` senza cambiare default in autonomia.
+- [ ] Valutare VAD/chunking dopo l'ottimizzazione Apple Silicon.
+- [ ] Valutare streaming o quasi realtime dopo worker persistente/Core ML.
 
 ## Decisioni rimandate
-- Core ML/Metal: rimandato per evitare di complicare il primo MVP; la smoke test Metal ha fallito su allocazione buffer, CPU/Accelerate funziona.
+- Core ML/Metal: non e opzionale; e rimandato solo dopo il fix del push-to-talk. La smoke test Metal ha fallito su allocazione buffer, CPU/Accelerate funziona come baseline.
 - Streaming realtime: rimandato fino a quando record/transcribe/paste e stabile.
 
 ## Fuori scope
