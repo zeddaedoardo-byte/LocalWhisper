@@ -47,12 +47,20 @@ final class SettingsStore: ObservableObject {
 
         let storedBinary = defaults.string(forKey: Keys.whisperBinaryPath)
         let resolvedBinary = SettingsStore.defaultWhisperBinaryPath()
-        if let storedBinary, FileManager.default.isExecutableFile(atPath: storedBinary) {
-            self.whisperBinaryPath = storedBinary
+        let bundledBinary = SettingsStore.bundledWhisperBinaryPath()
+
+        // Prefer the binary embedded in the running app bundle when available;
+        // it is guaranteed to match the running app's signature.
+        let chosenBinary: String
+        if let bundledBinary {
+            chosenBinary = bundledBinary
+        } else if let storedBinary, FileManager.default.isExecutableFile(atPath: storedBinary) {
+            chosenBinary = storedBinary
         } else {
-            self.whisperBinaryPath = resolvedBinary
-            defaults.set(resolvedBinary, forKey: Keys.whisperBinaryPath)
+            chosenBinary = resolvedBinary
         }
+        self.whisperBinaryPath = chosenBinary
+        defaults.set(chosenBinary, forKey: Keys.whisperBinaryPath)
 
         let storedModel = defaults.string(forKey: Keys.modelPath)
         let resolvedModel = ProjectPaths.defaultModelURL.path
@@ -74,14 +82,31 @@ final class SettingsStore: ObservableObject {
         modelPath = ProjectPaths.defaultModelURL.path
     }
 
+    private static func bundledWhisperBinaryPath() -> String? {
+        guard let resourceURL = Bundle.main.resourceURL else { return nil }
+        let candidate = resourceURL.appendingPathComponent("bin/whisper-cli").path
+        return FileManager.default.isExecutableFile(atPath: candidate) ? candidate : nil
+    }
+
     private static func defaultWhisperBinaryPath() -> String {
-        let candidates = [
+        var candidates: [String] = []
+
+        if let bundled = bundledWhisperBinaryPath() {
+            candidates.append(bundled)
+        }
+
+        candidates.append(
+            ProjectPaths.applicationSupportRoot
+                .appendingPathComponent("bin/whisper-cli")
+                .path
+        )
+        candidates.append(
             ProjectPaths.projectRoot
                 .appendingPathComponent("external/whisper.cpp/build/bin/whisper-cli")
-                .path,
-            "/opt/homebrew/bin/whisper-cli",
-            "/usr/local/bin/whisper-cli"
-        ]
+                .path
+        )
+        candidates.append("/opt/homebrew/bin/whisper-cli")
+        candidates.append("/usr/local/bin/whisper-cli")
 
         return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
             ?? candidates[0]
