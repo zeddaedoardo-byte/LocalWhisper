@@ -75,34 +75,57 @@ struct WhisperSettingsTab: View {
 
             Section {
                 ForEach(WhisperModelCatalog.models) { model in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(model.label).font(.system(size: 13))
-                            Text(model.filename).font(.caption.monospaced()).foregroundStyle(.secondary)
-                        }
-                        Spacer()
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(model.label).font(.system(size: 13))
+                                Text(model.filename).font(.caption.monospaced()).foregroundStyle(.secondary)
+                            }
+                            Spacer()
 
-                        if isCurrentModel(model) {
-                            Label("Attivo", systemImage: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                                .labelStyle(.iconOnly)
-                                .help("In uso")
-                        } else if isModelInstalled(model) {
-                            Button("Usa") {
-                                useModel(model)
-                            }
-                            .controlSize(.small)
-                        } else if downloader.inFlightModelID == model.id {
-                            ProgressView(value: downloader.progress)
-                                .frame(width: 100)
-                            Button("Annulla") { downloader.cancel() }
+                            if isCurrentModel(model) {
+                                Label("Attivo", systemImage: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                                    .labelStyle(.iconOnly)
+                                    .help("In uso")
+                            } else if isModelInstalled(model) {
+                                Button("Usa") { useModel(model) }
+                                    .controlSize(.small)
+                            } else if downloader.inFlightModelID == model.id {
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    ProgressView(value: downloader.progress).frame(width: 110)
+                                    Text(downloader.phase.label)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Button("Annulla") { downloader.cancel() }
+                                    .controlSize(.small)
+                            } else {
+                                Button(downloadButtonLabel(for: model)) {
+                                    Task { await downloadAndUse(model) }
+                                }
                                 .controlSize(.small)
-                        } else {
-                            Button("Scarica (\(model.approxMB) MB)") {
-                                Task { await downloadAndUse(model) }
+                                .disabled(downloader.inFlightModelID != nil)
                             }
-                            .controlSize(.small)
-                            .disabled(downloader.inFlightModelID != nil)
+                        }
+
+                        if isAppleSilicon, model.coreMLEncoderURL != nil, isModelInstalled(model) {
+                            HStack(spacing: 6) {
+                                Image(systemName: hasCoreML(model) ? "cpu.fill" : "cpu")
+                                    .foregroundStyle(hasCoreML(model) ? .green : .secondary)
+                                Text(hasCoreML(model) ? "Core ML encoder installato (Neural Engine)" : "Core ML encoder non installato")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                if !hasCoreML(model), downloader.inFlightModelID != model.id {
+                                    Button("Scarica (\(model.coreMLEncoderApproxMB ?? 0) MB)") {
+                                        Task { await downloadCoreMLOnly(model) }
+                                    }
+                                    .controlSize(.small)
+                                    .disabled(downloader.inFlightModelID != nil)
+                                }
+                            }
+                            .padding(.leading, 4)
                         }
                     }
                 }
@@ -200,6 +223,22 @@ struct WhisperSettingsTab: View {
         )
     }
 
+    private var isAppleSilicon: Bool {
+        HardwareProfile.current.isAppleSilicon
+    }
+
+    private func hasCoreML(_ model: WhisperModelInfo) -> Bool {
+        FileManager.default.fileExists(atPath: coreMLDirURL(for: model).path)
+    }
+
+    private func downloadButtonLabel(for model: WhisperModelInfo) -> String {
+        let modelMB = model.approxMB
+        if isAppleSilicon, let coreMB = model.coreMLEncoderApproxMB {
+            return "Scarica (\(modelMB) MB + \(coreMB) MB Core ML)"
+        }
+        return "Scarica (\(modelMB) MB)"
+    }
+
     private func isModelInstalled(_ model: WhisperModelInfo) -> Bool {
         let path = ProjectPaths.applicationSupportModelsDir
             .appendingPathComponent(model.filename).path
@@ -223,14 +262,36 @@ struct WhisperSettingsTab: View {
 
     private func downloadAndUse(_ model: WhisperModelInfo) async {
         downloadError = nil
+        let includeCoreML = HardwareProfile.current.isAppleSilicon && model.coreMLEncoderURL != nil
         do {
-            let url = try await downloader.download(
+            let url = try await downloader.downloadBundle(
                 model: model,
-                into: ProjectPaths.applicationSupportModelsDir
+                into: ProjectPaths.applicationSupportModelsDir,
+                includeCoreML: includeCoreML
             )
             settings.modelPath = url.path
         } catch {
             downloadError = "Download fallito: \(error.localizedDescription)"
         }
+    }
+
+    private func downloadCoreMLOnly(_ model: WhisperModelInfo) async {
+        downloadError = nil
+        guard let encoderURL = model.coreMLEncoderURL else { return }
+        _ = encoderURL
+        do {
+            let url = try await downloader.downloadBundle(
+                model: model,
+                into: ProjectPaths.applicationSupportModelsDir,
+                includeCoreML: true
+            )
+            settings.modelPath = url.path
+        } catch {
+            downloadError = "Download Core ML fallito: \(error.localizedDescription)"
+        }
+    }
+
+    fileprivate func coreMLDirURL(for model: WhisperModelInfo) -> URL {
+        ProjectPaths.applicationSupportModelsDir.appendingPathComponent(model.coreMLDirectoryName)
     }
 }
