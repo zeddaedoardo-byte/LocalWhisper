@@ -1,5 +1,5 @@
 import XCTest
-@testable import LocalWhisperFlow
+@testable import LocalWhisper
 
 final class PushToTalkStateMachineTests: XCTestCase {
     func testPressEmitsPressedOnce() {

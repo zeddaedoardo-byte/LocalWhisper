@@ -1,9 +1,9 @@
-# ORIENT.md - LocalWhisperFlow
+# ORIENT.md - LocalWhisper
 
 *Cosa devo sapere per mettermi a lavorare su questo dopo due settimane di assenza?*
 
 ## Cos'e questo progetto
-LocalWhisperFlow e una piccola app macOS locale stile WhisperFlow: tieni premuto Control per registrare, rilasci Control per trascrivere offline con Whisper Large V3 via `whisper.cpp` (Metal + Accelerate), poi il testo viene copiato negli appunti e, se abilitato, incollato nell'app attiva. Il sorgente vive sotto iCloud Drive in `/Users/edoardozedda/Library/Mobile Documents/com~apple~CloudDocs/Progetti/LocalWhisperFlow`. Il modello Large V3 invece NON sta in iCloud: vive in `~/Library/Application Support/LocalWhisperFlow/Models/`.
+LocalWhisper e una piccola app macOS locale stile WhisperFlow: tieni premuto Control per registrare, rilasci Control per trascrivere offline con Whisper Large V3 via `whisper.cpp` (Metal + Accelerate), poi il testo viene copiato negli appunti e, se abilitato, incollato nell'app attiva. Il sorgente vive sotto iCloud Drive in `/Users/edoardozedda/Library/Mobile Documents/com~apple~CloudDocs/Progetti/LocalWhisper`. Il modello Large V3 invece NON sta in iCloud: vive in `~/Library/Application Support/LocalWhisper/Models/`.
 
 ## Modello mentale del codebase
 La UI SwiftUI e un controllo sottile sopra servizi platform separati. `AppState` orchestra lo stato record/transcribe/paste e possiede un `WhisperService` che a sua volta gestisce un `WhisperServerWorker` (actor). Il worker fa fork di `whisper-server` come child process al primo warmup e lo tiene vivo per l'intera vita dell'app. Le dictation diventano POST multipart su `127.0.0.1:18642/inference`. `AudioRecorderService` produce WAV PCM 16 kHz mono. `ClipboardService` e `PasteService` gestiscono output. `PushToTalkService` usa un `CGEvent` tap globale per intercettare press/release di Control. `AppDelegate` installa signal handler e cleanup hook per terminare ogni server registrato in caso di SIGTERM/SIGINT/SIGHUP o quit normale.
@@ -29,6 +29,6 @@ La UI SwiftUI e un controllo sottile sopra servizi platform separati. `AppState`
 - SwiftPM build path = `/private/tmp/local-whisperflow-swiftpm-build` (no iCloud sync race su object file).
 
 ## Link chiave
-- Repository: https://github.com/zeddaedoardo-byte/LocalWhisperFlow
+- Repository: https://github.com/zeddaedoardo-byte/LocalWhisper
 - whisper.cpp: https://github.com/ggerganov/whisper.cpp
 - Endpoint server in dev: `http://127.0.0.1:18642/inference`

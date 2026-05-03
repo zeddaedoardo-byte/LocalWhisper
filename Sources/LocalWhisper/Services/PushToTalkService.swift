@@ -37,7 +37,7 @@ struct PushToTalkStateMachine {
     }
 }
 
-private let pttLog = Logger(subsystem: "com.local.LocalWhisperFlow", category: "ptt")
+private let pttLog = Logger(subsystem: "com.local.LocalWhisper", category: "ptt")
 
 enum PttDebugLog {
     private static let lock = NSLock()

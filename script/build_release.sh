@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_NAME="LocalWhisperFlow"
-BUNDLE_ID="com.local.LocalWhisperFlow"
+APP_NAME="LocalWhisper"
+BUNDLE_ID="com.local.LocalWhisper"
 MIN_SYSTEM_VERSION="14.0"
 SHORT_VERSION="${LWF_VERSION:-0.2.0}"
 BUILD_NUMBER="${LWF_BUILD:-$(date +%Y%m%d%H%M)}"
@@ -57,7 +57,7 @@ cat >"$INFO_PLIST" <<PLIST
   <key>CFBundleName</key>
   <string>$APP_NAME</string>
   <key>CFBundleDisplayName</key>
-  <string>LocalWhisperFlow</string>
+  <string>LocalWhisper</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
@@ -75,7 +75,7 @@ cat >"$INFO_PLIST" <<PLIST
   <key>NSHighResolutionCapable</key>
   <true/>
   <key>NSMicrophoneUsageDescription</key>
-  <string>LocalWhisperFlow records microphone audio and transcribes it locally with Whisper Large V3.</string>
+  <string>LocalWhisper records microphone audio and transcribes it locally with Whisper Large V3.</string>
 </dict>
 </plist>
 PLIST

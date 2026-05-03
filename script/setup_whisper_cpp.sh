@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WHISPER_DIR="$ROOT_DIR/external/whisper.cpp"
-MODEL_DIR="$HOME/Library/Application Support/LocalWhisperFlow/Models"
+MODEL_DIR="$HOME/Library/Application Support/LocalWhisper/Models"
 DEFAULT_MODEL="${LWF_DEFAULT_MODEL:-large-v3}"
 
 ARCH="$(uname -m)"

@@ -1,15 +1,15 @@
-# MEMORY.md - LocalWhisperFlow
+# MEMORY.md - LocalWhisper
 
 ## Decisioni architetturali
 - [domain] 2026-05-02 Scelto whisper.cpp come motore locale invece di Python/faster-whisper per stabilita e distribuibilita.
-- [domain] 2026-05-02 Scelto Whisper Large V3 (non Turbo) per accuratezza. Path default modello: `~/Library/Application Support/LocalWhisperFlow/Models/ggml-large-v3.bin`.
+- [domain] 2026-05-02 Scelto Whisper Large V3 (non Turbo) per accuratezza. Path default modello: `~/Library/Application Support/LocalWhisper/Models/ggml-large-v3.bin`.
 - [domain] 2026-05-02 Scelto MVP Control hold push-to-talk → transcribe → clipboard/paste. Streaming realtime, VAD e Core ML rimandati.
-- [domain] 2026-05-02 Progetto vive sotto iCloud Drive: `/Users/edoardozedda/Library/Mobile Documents/com~apple~CloudDocs/Progetti/LocalWhisperFlow`. Il MODELLO invece NON deve stare in iCloud (vedi gotcha sotto).
+- [domain] 2026-05-02 Progetto vive sotto iCloud Drive: `/Users/edoardozedda/Library/Mobile Documents/com~apple~CloudDocs/Progetti/LocalWhisper`. Il MODELLO invece NON deve stare in iCloud (vedi gotcha sotto).
 - [domain] 2026-05-02 Architettura runtime: `whisper-server` persistente come child process del bundle. App parla via HTTP `127.0.0.1:18642`. Modello caricato una sola volta al warmup; ogni dictation successiva ~2.6 s su M3 con Metal + Accelerate per audio 11 s.
 - [domain] 2026-05-02 whisper.cpp viene buildato STATICO (`-DBUILD_SHARED_LIBS=OFF`) con `-DGGML_METAL=ON -DGGML_METAL_EMBED_LIBRARY=ON -DGGML_ACCELERATE=ON -DGGML_BLAS=ON -DGGML_BLAS_VENDOR=Apple`. Eseguibili autocontenuti, non si rompono se la cartella viene spostata.
 
 ## Gotchas e comportamenti non ovvi
-- [domain] iCloud Drive + 3 GB model = morte: il primo mmap del modello tagged iCloud puo richiedere 200+ s (lazy load di pagine). Soluzione: tenere il modello in `~/Library/Application Support/LocalWhisperFlow/Models/`. Cold load locale ~5-10 s.
+- [domain] iCloud Drive + 3 GB model = morte: il primo mmap del modello tagged iCloud puo richiedere 200+ s (lazy load di pagine). Soluzione: tenere il modello in `~/Library/Application Support/LocalWhisper/Models/`. Cold load locale ~5-10 s.
 - [domain] Build whisper.cpp NON statica = rpath assoluto al path della build. Se la cartella viene spostata, `whisper-cli` cerca `libwhisper.1.dylib` al vecchio path e crasha con `dyld: Library not loaded`. Build statica risolve.
 - [domain] `Process` con `Pipe` su stdout NON drenata blocca il child quando il buffer pipe (~64 KB) si riempie. whisper-server scrive molto a stdout in init: bisogna installare un `readabilityHandler` no-op anche su stdout, oltre che su stderr.
 - [domain] `applicationWillTerminate` non viene chiamato se il processo riceve SIGTERM diretto (es. `pkill`). Per cleanup server affidabile servono signal handler espliciti (SIGTERM/SIGINT/SIGHUP) + `atexit` come backstop.

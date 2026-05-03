@@ -1,9 +1,9 @@
-# PLAN.md - LocalWhisperFlow
+# PLAN.md - LocalWhisper
 
 ## Stato Corrente
 *Aggiornato: 2026-05-02*
 
-**Cosa e attivo ora:** MVP funzionante end-to-end. App menu bar locale, whisper-server persistente con Metal + Accelerate, modello Large V3 in `~/Library/Application Support/LocalWhisperFlow/Models`, Control hold push-to-talk, auto-paste opzionale.
+**Cosa e attivo ora:** MVP funzionante end-to-end. App menu bar locale, whisper-server persistente con Metal + Accelerate, modello Large V3 in `~/Library/Application Support/LocalWhisper/Models`, Control hold push-to-talk, auto-paste opzionale.
 **Blocchi:** test di registrazione microfono dal vivo richiede interazione utente e permessi (Microphone + Accessibility).
 **Prossima cosa da fare:** verifica live record/paste in chat reale, poi feedback visivo su warmup/registrazione e gestione errori UX.
 

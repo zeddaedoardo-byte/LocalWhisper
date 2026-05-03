@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Creates a persistent self-signed code-signing identity in the user's login
-# keychain so that LocalWhisperFlow keeps the same code signature across
+# keychain so that LocalWhisper keeps the same code signature across
 # rebuilds. macOS TCC keys Accessibility / Microphone / Input Monitoring on
 # the signing identity (when present) instead of the cdhash, so granting
 # permission once stays valid across recompiles.
@@ -10,7 +10,7 @@ set -euo pipefail
 # Run this script ONCE per machine. It is safe to run repeatedly: it only
 # creates the cert if it does not already exist.
 
-IDENTITY_NAME="LocalWhisperFlow Dev"
+IDENTITY_NAME="LocalWhisper Dev"
 KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
 
 if security find-identity -p codesigning -v "$KEYCHAIN" | grep -q "$IDENTITY_NAME"; then

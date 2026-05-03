@@ -146,7 +146,7 @@ struct WhisperSettingsTab: View {
             } header: {
                 Text("Modello")
             } footer: {
-                Text("I modelli vengono scaricati in ~/Library/Application Support/LocalWhisperFlow/Models e sostituiscono il modello attivo solo dopo il download completo.")
+                Text("I modelli vengono scaricati in ~/Library/Application Support/LocalWhisper/Models e sostituiscono il modello attivo solo dopo il download completo.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

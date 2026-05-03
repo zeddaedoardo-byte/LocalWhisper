@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_NAME="LocalWhisperFlow"
+APP_NAME="LocalWhisper"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_APP="/Applications/$APP_NAME.app"
 

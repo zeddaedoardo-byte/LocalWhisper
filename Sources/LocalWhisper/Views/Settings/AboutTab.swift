@@ -13,7 +13,7 @@ struct AboutTab: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing))
 
-            Text("LocalWhisperFlow")
+            Text("LocalWhisper")
                 .font(.system(size: 22, weight: .semibold))
 
             Text("Versione \(version)")
@@ -26,7 +26,7 @@ struct AboutTab: View {
 
             HStack(spacing: 14) {
                 Button("GitHub") {
-                    if let url = URL(string: "https://github.com/zeddaedoardo-byte/LocalWhisperFlow") {
+                    if let url = URL(string: "https://github.com/zeddaedoardo-byte/LocalWhisper") {
                         NSWorkspace.shared.open(url)
                     }
                 }

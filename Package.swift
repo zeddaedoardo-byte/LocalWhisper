@@ -3,18 +3,18 @@
 import PackageDescription
 
 let package = Package(
-    name: "LocalWhisperFlow",
+    name: "LocalWhisper",
     platforms: [
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "LocalWhisperFlow", targets: ["LocalWhisperFlow"])
+        .executable(name: "LocalWhisper", targets: ["LocalWhisper"])
     ],
     targets: [
-        .executableTarget(name: "LocalWhisperFlow"),
+        .executableTarget(name: "LocalWhisper"),
         .testTarget(
-            name: "LocalWhisperFlowTests",
-            dependencies: ["LocalWhisperFlow"]
+            name: "LocalWhisperTests",
+            dependencies: ["LocalWhisper"]
         )
     ]
 )

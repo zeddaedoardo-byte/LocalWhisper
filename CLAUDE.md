@@ -1,9 +1,9 @@
-# CLAUDE.md - LocalWhisperFlow
+# CLAUDE.md - LocalWhisper
 
 ## Stack e convenzioni
 - macOS app nativa con SwiftPM, SwiftUI, AppKit dove serve, AVFoundation per audio.
 - Motore STT esterno: `whisper.cpp` con server persistente `whisper-server` (HTTP localhost:18642). `whisper-cli` resta come binario di riferimento per i path nelle settings.
-- Modello default: Whisper Large V3 ggml in `~/Library/Application Support/LocalWhisperFlow/Models/ggml-large-v3.bin`. Il modello NON deve stare in iCloud Drive.
+- Modello default: Whisper Large V3 ggml in `~/Library/Application Support/LocalWhisper/Models/ggml-large-v3.bin`. Il modello NON deve stare in iCloud Drive.
 - Codice e commenti in inglese.
 
 ## Comandi principali

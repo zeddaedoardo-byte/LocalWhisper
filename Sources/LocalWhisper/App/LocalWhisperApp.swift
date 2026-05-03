@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 @main
-struct LocalWhisperFlowApp: App {
+struct LocalWhisperApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var settings: SettingsStore
     @StateObject private var appState: AppState

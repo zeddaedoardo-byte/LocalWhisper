@@ -2,7 +2,7 @@ import AppKit
 import CoreGraphics
 import Foundation
 
-// Renders the LocalWhisperFlow app icon as a 1024x1024 PNG.
+// Renders the LocalWhisper app icon as a 1024x1024 PNG.
 // Usage: swift Tools/icon-renderer/main.swift <output.png>
 
 func renderIcon(size: CGFloat) -> NSImage {
