@@ -39,13 +39,16 @@ enum PerformancePreset: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Audio context for the encoder. 0 means full (1500). Smaller = faster but
-    /// risks truncating long utterances.
+    /// Audio context for the encoder. 0 means full (1500). Truncating used to be
+    /// a marginal speedup on the Speed preset, but pairing a truncated context
+    /// (which silence-pads the encoder window) with a small decoder like Turbo
+    /// and beam=1 produced deterministic hallucinations on short utterances:
+    /// every sub-2 s recording converged on the same boilerplate string. Keeping
+    /// the full audio context everywhere avoids the problem; the Speed preset is
+    /// still faster than Balanced/Quality thanks to beam=1.
     var audioContext: Int {
         switch self {
-        case .quality: 0
-        case .balanced: 0
-        case .speed: 768
+        case .quality, .balanced, .speed: 0
         }
     }
 }
