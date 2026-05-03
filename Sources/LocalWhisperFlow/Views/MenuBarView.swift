@@ -6,48 +6,54 @@ struct MenuBarView: View {
     @EnvironmentObject private var settings: SettingsStore
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(appState.status.title)
-                .font(.headline)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: appState.status.systemImage)
+                    .font(.system(size: 20))
+                    .foregroundStyle(statusTint)
+                    .frame(width: 28)
 
-            Text("Model: Whisper Large V3 (Metal)")
-                .foregroundStyle(.secondary)
-
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(appState.isServerReady ? Color.green : (appState.isWarmingUp ? Color.orange : Color.gray))
-                    .frame(width: 8, height: 8)
-                Text(appState.isServerReady ? "Server ready" : (appState.isWarmingUp ? "Warming up..." : "Server stopped"))
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(statusTitle)
+                        .font(.system(size: 13, weight: .semibold))
+                    Text(triggerHint)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
             }
 
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(appState.hasAccessibility ? Color.green : Color.red)
-                    .frame(width: 8, height: 8)
-                Text(appState.hasAccessibility ? "Accessibility OK" : "Accessibility missing")
-                    .foregroundStyle(.secondary)
+            HStack(spacing: 14) {
+                StatusPill(
+                    isOK: appState.isServerReady,
+                    isLoading: appState.isWarmingUp,
+                    label: appState.isServerReady ? "Server" : (appState.isWarmingUp ? "Warmup" : "Server")
+                )
+                StatusPill(
+                    isOK: appState.hasAccessibility,
+                    isLoading: false,
+                    label: "Accessibility"
+                )
             }
-
-            Text("Hold \(PushToTalkTrigger.byID(settings.pushToTalkTriggerID).label) to record")
-                .foregroundStyle(.secondary)
-
-            Text("Tap events: \(appState.tapEventsReceived)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text(String(format: "Flags: 0x%08llx  kc:%d", appState.lastTapFlags, appState.lastTapKeycode))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
 
             if !appState.lastTranscript.isEmpty {
                 Divider()
                 Text(appState.lastTranscript)
+                    .font(.system(size: 12))
                     .lineLimit(4)
+                    .foregroundStyle(.primary)
+                Button {
+                    appState.copyLastTranscript()
+                } label: {
+                    Label("Copy transcript", systemImage: "doc.on.doc")
+                }
+                .buttonStyle(.borderless)
             }
 
             if let error = appState.lastError {
                 Divider()
                 Text(error)
+                    .font(.system(size: 11))
                     .foregroundStyle(.red)
                     .lineLimit(4)
             }
@@ -69,23 +75,72 @@ struct MenuBarView: View {
             }
 
             SettingsLink {
-                Text("Settings")
+                Text("Settings...")
             }
 
             Divider()
 
-            Button("Quit") {
+            Button("Quit LocalWhisperFlow") {
                 NSApp.terminate(nil)
             }
             .keyboardShortcut("q")
         }
         .frame(width: 280)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+    }
+
+    private var statusTint: Color {
+        switch appState.status {
+        case .idle: .secondary
+        case .recording: .red
+        case .transcribing: .blue
+        case .completed: .green
+        case .failed: .orange
+        }
+    }
+
+    private var statusTitle: String {
+        switch appState.status {
+        case .idle: appState.isServerReady ? "Pronto" : "Caricamento Whisper..."
+        case .recording: "Registrazione in corso"
+        case .transcribing: "Trascrizione..."
+        case .completed: "Pronto"
+        case .failed: "Errore"
+        }
+    }
+
+    private var triggerHint: String {
+        let trigger = PushToTalkTrigger.byID(settings.pushToTalkTriggerID)
+        return "Tieni \(trigger.label) per dettare"
     }
 
     private func openAccessibilitySettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
             NSWorkspace.shared.open(url)
         }
+    }
+}
+
+private struct StatusPill: View {
+    let isOK: Bool
+    let isLoading: Bool
+    let label: String
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(color)
+                .frame(width: 7, height: 7)
+            Text(label)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var color: Color {
+        if isOK { return .green }
+        if isLoading { return .orange }
+        return .red
     }
 }

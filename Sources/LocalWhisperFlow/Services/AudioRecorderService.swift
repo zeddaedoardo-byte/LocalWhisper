@@ -24,50 +24,51 @@ enum AudioRecorderError: LocalizedError {
 final class AudioRecorderService: NSObject, ObservableObject {
     @Published private(set) var levelDB: Float = -160
 
-    var preferredDeviceUID: String?
+    var preferredDeviceUID: String? {
+        didSet {
+            if oldValue != preferredDeviceUID {
+                tearDownEngine()
+            }
+        }
+    }
+
+    private let pipelineLock = NSLock()
+    nonisolated(unsafe) private var audioFile: AVAudioFile?
+    nonisolated(unsafe) private var converter: AVAudioConverter?
+    nonisolated(unsafe) private var targetFormat: AVAudioFormat?
+    nonisolated(unsafe) private var isRecording: Bool = false
 
     private var engine: AVAudioEngine?
-    private var audioFile: AVAudioFile?
-    private var converter: AVAudioConverter?
+    private var inputFormat: AVAudioFormat?
     private var currentFileURL: URL?
-    private var pcmTargetFormat: AVAudioFormat?
+    private var isPrepared: Bool = false
+    private var deviceUIDApplied: String?
+    private var idleTimer: Timer?
+
+    func prewarm() async {
+        do {
+            try await prepareEngine()
+        } catch {
+            // Ignore. The first real recording will surface the error.
+        }
+    }
 
     func startRecording() async throws -> URL {
-        let isAuthorized = await requestMicrophoneAccess()
-        guard isAuthorized else {
-            throw AudioRecorderError.microphonePermissionDenied
+        if !isPrepared {
+            try await prepareEngine()
         }
+        guard let engine, let targetFormat else {
+            throw AudioRecorderError.recordingDidNotStart("Engine not ready.")
+        }
+
+        idleTimer?.invalidate()
+        idleTimer = nil
 
         let fileURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("local-whisperflow-\(UUID().uuidString)")
             .appendingPathExtension("wav")
 
-        let engine = AVAudioEngine()
-        let inputNode = engine.inputNode
-
-        if let uid = preferredDeviceUID,
-           let device = AudioDeviceCatalog.device(forUID: uid),
-           let unit = inputNode.audioUnit {
-            var deviceID = device.id
-            let status = AudioUnitSetProperty(
-                unit,
-                kAudioOutputUnitProperty_CurrentDevice,
-                kAudioUnitScope_Global,
-                0,
-                &deviceID,
-                UInt32(MemoryLayout.size(ofValue: deviceID))
-            )
-            if status != noErr {
-                throw AudioRecorderError.recordingDidNotStart("Could not bind input device (status \(status)).")
-            }
-        }
-
-        let inputFormat = inputNode.outputFormat(forBus: 0)
-        guard inputFormat.sampleRate > 0 else {
-            throw AudioRecorderError.recordingDidNotStart("Selected input device produced an invalid format.")
-        }
-
-        let targetSettings: [String: Any] = [
+        let settings: [String: Any] = [
             AVFormatIDKey: Int(kAudioFormatLinearPCM),
             AVSampleRateKey: 16_000,
             AVNumberOfChannelsKey: 1,
@@ -75,62 +76,54 @@ final class AudioRecorderService: NSObject, ObservableObject {
             AVLinearPCMIsFloatKey: false,
             AVLinearPCMIsBigEndianKey: false
         ]
-        guard let targetFormat = AVAudioFormat(
-            commonFormat: .pcmFormatInt16,
-            sampleRate: 16_000,
-            channels: 1,
-            interleaved: true
-        ) else {
-            throw AudioRecorderError.recordingDidNotStart("Could not build target audio format.")
-        }
-
         let file: AVAudioFile
         do {
-            file = try AVAudioFile(forWriting: fileURL, settings: targetSettings,
-                                   commonFormat: .pcmFormatInt16, interleaved: true)
+            file = try AVAudioFile(
+                forWriting: fileURL,
+                settings: settings,
+                commonFormat: .pcmFormatInt16,
+                interleaved: true
+            )
         } catch {
             throw AudioRecorderError.recordingDidNotStart(error.localizedDescription)
         }
 
-        guard let converter = AVAudioConverter(from: inputFormat, to: targetFormat) else {
-            throw AudioRecorderError.recordingDidNotStart("Could not build audio converter.")
-        }
-
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
-            guard let self else { return }
-            self.process(buffer: buffer, converter: converter, targetFormat: targetFormat, file: file)
-        }
-
-        do {
-            engine.prepare()
-            try engine.start()
-        } catch {
-            inputNode.removeTap(onBus: 0)
-            throw AudioRecorderError.recordingDidNotStart(error.localizedDescription)
-        }
-
-        self.engine = engine
+        pipelineLock.lock()
         self.audioFile = file
-        self.converter = converter
-        self.pcmTargetFormat = targetFormat
-        self.currentFileURL = fileURL
+        self.targetFormat = targetFormat
+        self.isRecording = true
+        pipelineLock.unlock()
+
+        currentFileURL = fileURL
+
+        if !engine.isRunning {
+            do {
+                try engine.start()
+            } catch {
+                pipelineLock.lock()
+                self.isRecording = false
+                self.audioFile = nil
+                pipelineLock.unlock()
+                throw AudioRecorderError.recordingDidNotStart(error.localizedDescription)
+            }
+        }
         return fileURL
     }
 
     func stopRecording() throws -> URL {
-        guard let engine, let currentFileURL else {
+        guard let url = currentFileURL else {
             throw AudioRecorderError.noActiveRecording
         }
 
-        engine.inputNode.removeTap(onBus: 0)
-        engine.stop()
-        self.engine = nil
-        self.audioFile = nil
-        self.converter = nil
-        self.pcmTargetFormat = nil
-        self.currentFileURL = nil
+        pipelineLock.lock()
+        isRecording = false
+        audioFile = nil
+        pipelineLock.unlock()
+
+        currentFileURL = nil
         levelDB = -160
-        return currentFileURL
+        scheduleEngineIdleStop()
+        return url
     }
 
     func quickLevelTest(seconds: TimeInterval = 1.5) async throws -> Float {
@@ -146,16 +139,141 @@ final class AudioRecorderService: NSObject, ObservableObject {
         return peak
     }
 
-    private func process(buffer: AVAudioPCMBuffer,
-                         converter: AVAudioConverter,
-                         targetFormat: AVAudioFormat,
-                         file: AVAudioFile) {
-        let inputFrames = AVAudioFrameCount(buffer.frameLength)
-        let ratio = targetFormat.sampleRate / buffer.format.sampleRate
-        let outFrameCapacity = AVAudioFrameCount(Double(inputFrames) * ratio + 1024)
+    private func prepareEngine() async throws {
+        guard !isPrepared else { return }
+        let isAuthorized = await requestMicrophoneAccess()
+        guard isAuthorized else {
+            throw AudioRecorderError.microphonePermissionDenied
+        }
 
-        guard let outBuffer = AVAudioPCMBuffer(pcmFormat: targetFormat,
-                                               frameCapacity: outFrameCapacity) else { return }
+        let engine = AVAudioEngine()
+        let inputNode = engine.inputNode
+        applyDevice(to: inputNode)
+
+        let inputFormat = inputNode.outputFormat(forBus: 0)
+        guard inputFormat.sampleRate > 0 else {
+            throw AudioRecorderError.recordingDidNotStart("Selected input device produced an invalid format.")
+        }
+        guard let targetFormat = AVAudioFormat(
+            commonFormat: .pcmFormatInt16,
+            sampleRate: 16_000,
+            channels: 1,
+            interleaved: true
+        ) else {
+            throw AudioRecorderError.recordingDidNotStart("Could not build target audio format.")
+        }
+        guard let converter = AVAudioConverter(from: inputFormat, to: targetFormat) else {
+            throw AudioRecorderError.recordingDidNotStart("Could not build audio converter.")
+        }
+
+        let lock = pipelineLock
+        let weakSelf = WeakBox(self)
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { buffer, _ in
+            AudioRecorderService.handleTap(
+                buffer: buffer,
+                weakService: weakSelf,
+                lock: lock
+            )
+        }
+
+        engine.prepare()
+
+        self.engine = engine
+        self.inputFormat = inputFormat
+        self.targetFormat = targetFormat
+        self.converter = converter
+        self.deviceUIDApplied = preferredDeviceUID
+        self.isPrepared = true
+    }
+
+    private func applyDevice(to inputNode: AVAudioInputNode) {
+        guard let uid = preferredDeviceUID, !uid.isEmpty,
+              let device = AudioDeviceCatalog.device(forUID: uid),
+              let unit = inputNode.audioUnit else { return }
+        var deviceID = device.id
+        _ = AudioUnitSetProperty(
+            unit,
+            kAudioOutputUnitProperty_CurrentDevice,
+            kAudioUnitScope_Global,
+            0,
+            &deviceID,
+            UInt32(MemoryLayout.size(ofValue: deviceID))
+        )
+    }
+
+    private func tearDownEngine() {
+        idleTimer?.invalidate()
+        idleTimer = nil
+        if let engine {
+            engine.inputNode.removeTap(onBus: 0)
+            if engine.isRunning { engine.stop() }
+        }
+        engine = nil
+        inputFormat = nil
+        currentFileURL = nil
+
+        pipelineLock.lock()
+        audioFile = nil
+        targetFormat = nil
+        converter = nil
+        isRecording = false
+        pipelineLock.unlock()
+
+        isPrepared = false
+        deviceUIDApplied = nil
+    }
+
+    private func scheduleEngineIdleStop() {
+        idleTimer?.invalidate()
+        let timer = Timer(timeInterval: 8.0, repeats: false) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                guard !self.isRecording else { return }
+                if self.engine?.isRunning == true {
+                    self.engine?.stop()
+                }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        idleTimer = timer
+    }
+
+    nonisolated private static func handleTap(
+        buffer: AVAudioPCMBuffer,
+        weakService: WeakBox<AudioRecorderService>,
+        lock: NSLock
+    ) {
+        let db = peakDB(buffer: buffer)
+        if let service = weakService.value {
+            Task { @MainActor in service.levelDB = db }
+        }
+
+        lock.lock()
+        let recording: Bool
+        let file: AVAudioFile?
+        let converter: AVAudioConverter?
+        let target: AVAudioFormat?
+        if let service = weakService.value {
+            recording = service.isRecording
+            file = service.audioFile
+            converter = service.converter
+            target = service.targetFormat
+        } else {
+            recording = false
+            file = nil
+            converter = nil
+            target = nil
+        }
+        lock.unlock()
+
+        guard recording, let file, let converter, let target else { return }
+
+        let inputFrames = AVAudioFrameCount(buffer.frameLength)
+        let ratio = target.sampleRate / buffer.format.sampleRate
+        let outFrameCapacity = AVAudioFrameCount(Double(inputFrames) * ratio + 1024)
+        guard let outBuffer = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: outFrameCapacity) else {
+            return
+        }
 
         var fed = false
         var error: NSError?
@@ -172,14 +290,9 @@ final class AudioRecorderService: NSObject, ObservableObject {
         if outBuffer.frameLength > 0 {
             try? file.write(from: outBuffer)
         }
-
-        let db = peakDB(buffer: buffer)
-        Task { @MainActor [weak self] in
-            self?.levelDB = db
-        }
     }
 
-    private func peakDB(buffer: AVAudioPCMBuffer) -> Float {
+    nonisolated private static func peakDB(buffer: AVAudioPCMBuffer) -> Float {
         let frames = Int(buffer.frameLength)
         guard frames > 0 else { return -160 }
         var maxAbs: Float = 0
@@ -222,4 +335,9 @@ final class AudioRecorderService: NSObject, ObservableObject {
             return false
         }
     }
+}
+
+private final class WeakBox<T: AnyObject>: @unchecked Sendable {
+    weak var value: T?
+    init(_ value: T?) { self.value = value }
 }

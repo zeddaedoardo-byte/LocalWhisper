@@ -25,15 +25,15 @@ enum TranscriptionStatus: Equatable {
     var systemImage: String {
         switch self {
         case .idle:
-            "mic"
+            "mic.fill"
         case .recording:
-            "stop.circle.fill"
+            "record.circle.fill"
         case .transcribing:
             "waveform"
         case .completed:
-            "checkmark.circle"
+            "checkmark.circle.fill"
         case .failed:
-            "exclamationmark.triangle"
+            "exclamationmark.triangle.fill"
         }
     }
 

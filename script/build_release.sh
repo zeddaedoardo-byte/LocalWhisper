@@ -1,29 +1,29 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MODE="${1:-run}"
 APP_NAME="LocalWhisperFlow"
 BUNDLE_ID="com.local.LocalWhisperFlow"
 MIN_SYSTEM_VERSION="14.0"
+SHORT_VERSION="${LWF_VERSION:-0.2.0}"
+BUILD_NUMBER="${LWF_BUILD:-$(date +%Y%m%d%H%M)}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SWIFT_BUILD_DIR="/private/tmp/local-whisperflow-swiftpm-build"
-DIST_DIR="/private/tmp/local-whisperflow-app"
-APP_BUNDLE="$DIST_DIR/$APP_NAME.app"
+SWIFT_BUILD_DIR="/private/tmp/local-whisperflow-release-build"
+RELEASE_DIR="$ROOT_DIR/dist/release"
+APP_BUNDLE="$RELEASE_DIR/$APP_NAME.app"
 APP_CONTENTS="$APP_BUNDLE/Contents"
 APP_MACOS="$APP_CONTENTS/MacOS"
 APP_RESOURCES="$APP_CONTENTS/Resources"
 APP_BINARY="$APP_MACOS/$APP_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
 ICON_SOURCE="$ROOT_DIR/Resources/AppIcon.icns"
-SHORT_VERSION="${LWF_VERSION:-0.2.0}"
-BUILD_NUMBER="${LWF_BUILD:-$(date +%Y%m%d%H%M)}"
+DMG_PATH="$RELEASE_DIR/$APP_NAME-$SHORT_VERSION.dmg"
 
-pkill -x "$APP_NAME" >/dev/null 2>&1 || true
+echo "==> Building release binary"
+swift build -c release --scratch-path "$SWIFT_BUILD_DIR"
+BUILD_BINARY="$(swift build -c release --scratch-path "$SWIFT_BUILD_DIR" --show-bin-path)/$APP_NAME"
 
-swift build --scratch-path "$SWIFT_BUILD_DIR"
-BUILD_BINARY="$(swift build --scratch-path "$SWIFT_BUILD_DIR" --show-bin-path)/$APP_NAME"
-
+echo "==> Assembling .app bundle"
 rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_MACOS" "$APP_RESOURCES"
 cp "$BUILD_BINARY" "$APP_BINARY"
@@ -68,41 +68,35 @@ cat >"$INFO_PLIST" <<PLIST
 </plist>
 PLIST
 
+echo "==> Cleaning extended attributes"
 xattr -cr "$APP_BUNDLE" 2>/dev/null || true
 
+echo "==> Code signing"
 SIGNING_HASH="$(security find-identity -p codesigning -v 2>/dev/null | awk '/Apple Development:/ {print $2; exit}')"
 if [[ -n "$SIGNING_HASH" ]]; then
+  echo "    using identity: $SIGNING_HASH"
   codesign --force --sign "$SIGNING_HASH" --identifier "$BUNDLE_ID" --timestamp=none "$APP_BUNDLE"
 else
+  echo "    no Apple Development identity found, signing ad-hoc"
   codesign --force --sign - --identifier "$BUNDLE_ID" --timestamp=none "$APP_BUNDLE"
 fi
 
-open_app() {
-  /usr/bin/open -n "$APP_BUNDLE"
-}
+echo "==> Building DMG"
+DMG_STAGE="$(mktemp -d)"
+trap 'rm -rf "$DMG_STAGE"' EXIT
+cp -R "$APP_BUNDLE" "$DMG_STAGE/"
+ln -s /Applications "$DMG_STAGE/Applications"
 
-case "$MODE" in
-  run)
-    open_app
-    ;;
-  --debug|debug)
-    lldb -- "$APP_BINARY"
-    ;;
-  --logs|logs)
-    open_app
-    /usr/bin/log stream --info --style compact --predicate "process == \"$APP_NAME\""
-    ;;
-  --telemetry|telemetry)
-    open_app
-    /usr/bin/log stream --info --style compact --predicate "subsystem == \"$BUNDLE_ID\""
-    ;;
-  --verify|verify)
-    open_app
-    sleep 1
-    pgrep -x "$APP_NAME" >/dev/null
-    ;;
-  *)
-    echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2
-    exit 2
-    ;;
-esac
+rm -f "$DMG_PATH"
+hdiutil create \
+  -volname "$APP_NAME $SHORT_VERSION" \
+  -srcfolder "$DMG_STAGE" \
+  -format UDZO \
+  -fs HFS+ \
+  -imagekey zlib-level=9 \
+  "$DMG_PATH"
+
+echo
+echo "Done."
+echo "  App: $APP_BUNDLE"
+echo "  DMG: $DMG_PATH"

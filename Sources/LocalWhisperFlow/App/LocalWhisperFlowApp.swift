@@ -18,7 +18,7 @@ struct LocalWhisperFlowApp: App {
                 .environmentObject(settings)
                 .environmentObject(appState)
         } label: {
-            Image(systemName: appState.status.systemImage)
+            MenuBarIcon(appState: appState)
         }
         .menuBarExtraStyle(.menu)
 
@@ -26,6 +26,42 @@ struct LocalWhisperFlowApp: App {
             SettingsView()
                 .environmentObject(settings)
                 .environmentObject(appState)
+        }
+    }
+}
+
+private struct MenuBarIcon: View {
+    @ObservedObject var appState: AppState
+
+    var body: some View {
+        if #available(macOS 14, *) {
+            Image(systemName: symbol)
+                .symbolRenderingMode(.monochrome)
+                .symbolEffect(.variableColor.iterative.reversing,
+                              isActive: shouldAnimate)
+        } else {
+            Image(systemName: symbol)
+        }
+    }
+
+    private var symbol: String {
+        switch appState.status {
+        case .recording: "record.circle.fill"
+        case .transcribing: "waveform"
+        case .completed: "checkmark.circle.fill"
+        case .failed: "exclamationmark.triangle.fill"
+        case .idle:
+            if appState.isWarmingUp { "mic.badge.ellipsis" }
+            else if appState.isServerReady { "mic.fill" }
+            else { "mic" }
+        }
+    }
+
+    private var shouldAnimate: Bool {
+        switch appState.status {
+        case .recording, .transcribing: true
+        case .idle: appState.isWarmingUp
+        default: false
         }
     }
 }
