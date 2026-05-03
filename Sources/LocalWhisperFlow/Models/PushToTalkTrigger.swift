@@ -83,4 +83,46 @@ extension PushToTalkTrigger {
     static func byID(_ id: String) -> PushToTalkTrigger {
         all.first { $0.id == id } ?? .fn
     }
+
+    static func make(id: String, label: String, keycode: Int, flags: UInt64) -> PushToTalkTrigger {
+        let modifierMask: UInt64 =
+            0x800000 |   // fn
+            0x100000 |   // command
+            0x80000  |   // option
+            0x40000  |   // control
+            0x20000  |   // shift
+            0x10000      // caps lock
+        let modifierBits = flags & modifierMask
+        let count = modifierBits.nonzeroBitCount
+        if count > 1 {
+            return PushToTalkTrigger(id: id, label: label, kind: .modifierCombo(requiredFlags: flags))
+        }
+        return PushToTalkTrigger(id: id, label: label, kind: .modifierKey(keycode: keycode, requiredFlags: flags))
+    }
+
+    static func describe(keycode: Int, flags: UInt64) -> String {
+        var parts: [String] = []
+        if flags & 0x800000 != 0 { parts.append("fn") }
+        if flags & 0x10000 != 0 { parts.append("⇪") }
+        if flags & 0x40000 != 0 { parts.append("⌃") }
+        if flags & 0x80000 != 0 { parts.append("⌥") }
+        if flags & 0x20000 != 0 { parts.append("⇧") }
+        if flags & 0x100000 != 0 { parts.append("⌘") }
+        if parts.isEmpty {
+            parts.append("kc \(keycode)")
+        } else if parts.count == 1, parts.first != "fn" {
+            let side: String?
+            if flags & 0x000010 != 0 || flags & 0x000040 != 0 || flags & 0x000004 != 0 || flags & 0x002000 != 0 {
+                side = "Right"
+            } else if flags & 0x000008 != 0 || flags & 0x000020 != 0 || flags & 0x000002 != 0 || flags & 0x000001 != 0 {
+                side = "Left"
+            } else {
+                side = nil
+            }
+            if let side {
+                parts[0] = "\(side) \(parts[0])"
+            }
+        }
+        return parts.joined(separator: " + ")
+    }
 }

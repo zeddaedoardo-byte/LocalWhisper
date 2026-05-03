@@ -4,50 +4,34 @@ import SwiftUI
 struct MenuBarView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var settings: SettingsStore
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                Image(systemName: appState.status.systemImage)
-                    .font(.system(size: 20))
-                    .foregroundStyle(statusTint)
-                    .frame(width: 28)
+        VStack(alignment: .leading, spacing: 0) {
+            header
+                .padding(.horizontal, 14)
+                .padding(.top, 12)
+                .padding(.bottom, 10)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(statusTitle)
-                        .font(.system(size: 13, weight: .semibold))
-                    Text(triggerHint)
+            if let warning = warningMessage {
+                Divider()
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .foregroundStyle(.orange)
+                    Text(warning)
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
+                    Spacer()
                 }
-                Spacer()
-            }
-
-            HStack(spacing: 14) {
-                StatusPill(
-                    isOK: appState.isServerReady,
-                    isLoading: appState.isWarmingUp,
-                    label: appState.isServerReady ? "Server" : (appState.isWarmingUp ? "Warmup" : "Server")
-                )
-                StatusPill(
-                    isOK: appState.hasAccessibility,
-                    isLoading: false,
-                    label: "Accessibility"
-                )
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
             }
 
             if !appState.lastTranscript.isEmpty {
                 Divider()
-                Text(appState.lastTranscript)
-                    .font(.system(size: 12))
-                    .lineLimit(4)
-                    .foregroundStyle(.primary)
-                Button {
-                    appState.copyLastTranscript()
-                } label: {
-                    Label("Copy transcript", systemImage: "doc.on.doc")
-                }
-                .buttonStyle(.borderless)
+                transcriptSection
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
             }
 
             if let error = appState.lastError {
@@ -55,44 +39,116 @@ struct MenuBarView: View {
                 Text(error)
                     .font(.system(size: 11))
                     .foregroundStyle(.red)
-                    .lineLimit(4)
+                    .lineLimit(3)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
             }
 
             Divider()
 
-            Button(appState.status.primaryActionTitle) {
-                appState.toggleRecording()
-            }
-            .disabled(!appState.status.canToggleRecording)
+            actions
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+        }
+        .frame(width: 300)
+    }
 
-            Toggle("Auto Paste", isOn: $settings.autoPaste)
+    private var header: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(statusTint.opacity(0.15))
+                    .frame(width: 32, height: 32)
+                Image(systemName: appState.status.systemImage)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(statusTint)
+            }
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(statusTitle)
+                    .font(.system(size: 13, weight: .semibold))
+                Text(triggerHint)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+    }
+
+    private var transcriptSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Ultima trascrizione")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                Spacer()
+                Button {
+                    appState.copyLastTranscript()
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 11))
+                }
+                .buttonStyle(.borderless)
+                .help("Copia trascritto")
+            }
+            Text(appState.lastTranscript)
+                .font(.system(size: 12))
+                .foregroundStyle(.primary)
+                .lineLimit(4)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var actions: some View {
+        VStack(spacing: 2) {
+            MenuRow(
+                icon: appState.status == .recording ? "stop.fill" : "mic.fill",
+                label: appState.status.primaryActionTitle,
+                disabled: !appState.status.canToggleRecording,
+                action: appState.toggleRecording
+            )
+
+            MenuToggleRow(
+                icon: "doc.on.clipboard",
+                label: "Auto Paste",
+                isOn: $settings.autoPaste
+            )
 
             if !appState.hasAccessibility {
-                Button("Grant Accessibility...") {
-                    appState.requestAccessibilityPermission()
-                    openAccessibilitySettings()
+                MenuRow(
+                    icon: "lock.open",
+                    label: "Concedi Accessibility...",
+                    action: {
+                        appState.requestAccessibilityPermission()
+                        openAccessibilitySettings()
+                    }
+                )
+            }
+
+            Divider().padding(.vertical, 4)
+
+            MenuRow(
+                icon: "gearshape",
+                label: "Settings...",
+                action: {
+                    openSettings()
+                    NSApp.activate(ignoringOtherApps: true)
                 }
-            }
+            )
 
-            SettingsLink {
-                Text("Settings...")
-            }
-
-            Divider()
-
-            Button("Quit LocalWhisperFlow") {
-                NSApp.terminate(nil)
-            }
-            .keyboardShortcut("q")
+            MenuRow(
+                icon: "power",
+                label: "Esci",
+                shortcut: "⌘Q",
+                action: { NSApp.terminate(nil) }
+            )
         }
-        .frame(width: 280)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
     }
 
     private var statusTint: Color {
         switch appState.status {
-        case .idle: .secondary
+        case .idle: appState.isServerReady ? .green : .secondary
         case .recording: .red
         case .transcribing: .blue
         case .completed: .green
@@ -102,9 +158,9 @@ struct MenuBarView: View {
 
     private var statusTitle: String {
         switch appState.status {
-        case .idle: appState.isServerReady ? "Pronto" : "Caricamento Whisper..."
-        case .recording: "Registrazione in corso"
-        case .transcribing: "Trascrizione..."
+        case .idle: "Pronto"
+        case .recording: "Registrazione"
+        case .transcribing: "Trascrizione"
         case .completed: "Pronto"
         case .failed: "Errore"
         }
@@ -115,6 +171,19 @@ struct MenuBarView: View {
         return "Tieni \(trigger.label) per dettare"
     }
 
+    private var warningMessage: String? {
+        if !appState.hasAccessibility {
+            return "Accessibility non concessa"
+        }
+        if appState.isWarmingUp {
+            return "Caricamento modello..."
+        }
+        if !appState.isServerReady && !appState.isWarmingUp {
+            return "Server fermo"
+        }
+        return nil
+    }
+
     private func openAccessibilitySettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
             NSWorkspace.shared.open(url)
@@ -122,25 +191,76 @@ struct MenuBarView: View {
     }
 }
 
-private struct StatusPill: View {
-    let isOK: Bool
-    let isLoading: Bool
+private struct MenuRow: View {
+    let icon: String
     let label: String
+    var shortcut: String? = nil
+    var disabled: Bool = false
+    let action: () -> Void
+
+    @State private var hovered = false
 
     var body: some View {
-        HStack(spacing: 5) {
-            Circle()
-                .fill(color)
-                .frame(width: 7, height: 7)
-            Text(label)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 12))
+                    .frame(width: 16)
+                    .foregroundStyle(disabled ? .secondary : .primary)
+                Text(label)
+                    .font(.system(size: 13))
+                    .foregroundStyle(disabled ? .secondary : .primary)
+                Spacer()
+                if let shortcut {
+                    Text(shortcut)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(hovered && !disabled ? Color.accentColor.opacity(0.15) : Color.clear)
+            )
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .onHover { hovered = $0 }
     }
+}
 
-    private var color: Color {
-        if isOK { return .green }
-        if isLoading { return .orange }
-        return .red
+private struct MenuToggleRow: View {
+    let icon: String
+    let label: String
+    @Binding var isOn: Bool
+
+    @State private var hovered = false
+
+    var body: some View {
+        Button(action: { isOn.toggle() }) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 12))
+                    .frame(width: 16)
+                Text(label)
+                    .font(.system(size: 13))
+                Spacer()
+                Toggle("", isOn: $isOn)
+                    .labelsHidden()
+                    .controlSize(.small)
+                    .toggleStyle(.switch)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(hovered ? Color.accentColor.opacity(0.10) : Color.clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
     }
 }

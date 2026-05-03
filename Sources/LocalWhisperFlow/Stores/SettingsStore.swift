@@ -8,6 +8,11 @@ final class SettingsStore: ObservableObject {
         static let autoPaste = "autoPaste"
         static let preferredMicUID = "preferredMicUID"
         static let pushToTalkTriggerID = "pushToTalkTriggerID"
+        static let customTriggerKeycode = "customTriggerKeycode"
+        static let customTriggerFlags = "customTriggerFlags"
+        static let customTriggerLabel = "customTriggerLabel"
+        static let performancePreset = "performancePreset"
+        static let didSuggestPreset = "didSuggestPreset"
     }
 
     private let defaults: UserDefaults
@@ -42,6 +47,27 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(pushToTalkTriggerID, forKey: Keys.pushToTalkTriggerID) }
     }
 
+    @Published var customTriggerKeycode: Int {
+        didSet { defaults.set(customTriggerKeycode, forKey: Keys.customTriggerKeycode) }
+    }
+
+    @Published var customTriggerFlags: UInt64 {
+        didSet { defaults.set(String(customTriggerFlags), forKey: Keys.customTriggerFlags) }
+    }
+
+    @Published var customTriggerLabel: String {
+        didSet { defaults.set(customTriggerLabel, forKey: Keys.customTriggerLabel) }
+    }
+
+    @Published var performancePresetID: String {
+        didSet { defaults.set(performancePresetID, forKey: Keys.performancePreset) }
+    }
+
+    var performancePreset: PerformancePreset {
+        get { PerformancePreset(rawValue: performancePresetID) ?? .balanced }
+        set { performancePresetID = newValue.rawValue }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
@@ -71,10 +97,25 @@ final class SettingsStore: ObservableObject {
             defaults.set(resolvedModel, forKey: Keys.modelPath)
         }
 
-        self.language = defaults.string(forKey: Keys.language) ?? "it"
+        self.language = defaults.string(forKey: Keys.language) ?? "auto"
         self.autoPaste = defaults.object(forKey: Keys.autoPaste) as? Bool ?? true
         self.preferredMicUID = defaults.string(forKey: Keys.preferredMicUID) ?? ""
         self.pushToTalkTriggerID = defaults.string(forKey: Keys.pushToTalkTriggerID) ?? PushToTalkTrigger.fn.id
+        self.customTriggerKeycode = defaults.object(forKey: Keys.customTriggerKeycode) as? Int ?? -1
+        self.customTriggerFlags = (defaults.string(forKey: Keys.customTriggerFlags).flatMap(UInt64.init)) ?? 0
+        self.customTriggerLabel = defaults.string(forKey: Keys.customTriggerLabel) ?? ""
+
+        let didSuggest = defaults.bool(forKey: Keys.didSuggestPreset)
+        let storedPreset = defaults.string(forKey: Keys.performancePreset)
+        if let storedPreset, !storedPreset.isEmpty {
+            self.performancePresetID = storedPreset
+        } else if !didSuggest {
+            self.performancePresetID = HardwareProfile.current.suggestedPreset.rawValue
+            defaults.set(self.performancePresetID, forKey: Keys.performancePreset)
+            defaults.set(true, forKey: Keys.didSuggestPreset)
+        } else {
+            self.performancePresetID = PerformancePreset.balanced.rawValue
+        }
     }
 
     func resetDefaultPaths() {

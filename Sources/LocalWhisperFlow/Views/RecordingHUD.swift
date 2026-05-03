@@ -18,7 +18,9 @@ final class RecordingHUDViewModel: ObservableObject {
     @Published var hint: String = ""
 }
 
-private let kHUDBarCount = 7
+private let kHUDBarCount = 5
+private let kHUDWidth: CGFloat = 200
+private let kHUDHeight: CGFloat = 48
 
 struct RecordingHUDView: View {
     @ObservedObject var viewModel: RecordingHUDViewModel
@@ -27,32 +29,25 @@ struct RecordingHUDView: View {
         ZStack {
             HUDVisualEffect(material: .hudWindow)
 
-            HStack(spacing: 14) {
+            HStack(spacing: 9) {
                 indicator
-                    .frame(width: 26, height: 26)
+                    .frame(width: 16, height: 16)
 
-                VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
 
                     EqualizerView(state: viewModel.state, levelDB: viewModel.levelDB)
-                        .frame(height: 16)
-
-                    if !hint.isEmpty {
-                        Text(hint)
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
+                        .frame(height: 11)
                 }
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 8)
         }
-        .frame(width: 300, height: 76)
+        .frame(width: kHUDWidth, height: kHUDHeight)
     }
 
     private var title: String {
@@ -62,20 +57,11 @@ struct RecordingHUDView: View {
         case .ready: "Pronto"
         case .recording: "Registrazione"
         case .transcribing: "Trascrizione"
-        case .completed: "Fatto"
-        case .error: "Errore"
+        case .completed(let preview): preview.isEmpty ? "Fatto" : preview
+        case .error(let message): message.isEmpty ? "Errore" : message
         }
     }
 
-    private var hint: String {
-        if case .completed(let preview) = viewModel.state, !preview.isEmpty {
-            return preview
-        }
-        if case .error(let message) = viewModel.state, !message.isEmpty {
-            return message
-        }
-        return viewModel.hint
-    }
 
     @ViewBuilder
     private var indicator: some View {
@@ -243,7 +229,7 @@ final class RecordingHUDController {
     private func createPanel() {
         let host = NSHostingView(rootView: RecordingHUDView(viewModel: viewModel))
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 76),
+            contentRect: NSRect(x: 0, y: 0, width: kHUDWidth, height: kHUDHeight),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false

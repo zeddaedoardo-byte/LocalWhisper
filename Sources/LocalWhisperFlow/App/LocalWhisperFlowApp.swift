@@ -20,7 +20,7 @@ struct LocalWhisperFlowApp: App {
         } label: {
             MenuBarIcon(appState: appState)
         }
-        .menuBarExtraStyle(.menu)
+        .menuBarExtraStyle(.window)
 
         Settings {
             SettingsView()

@@ -27,19 +27,20 @@ final class WhisperService {
         self.worker = worker
     }
 
-    func warmup(cliBinaryPath: String, modelPath: String) async throws {
+    func warmup(cliBinaryPath: String, modelPath: String, params: WhisperServerWorker.DecodingParams) async throws {
         let serverPath = Self.serverBinary(forCLIPath: cliBinaryPath)
-        try await worker.ensureRunning(serverBinaryPath: serverPath, modelPath: modelPath)
+        try await worker.ensureRunning(serverBinaryPath: serverPath, modelPath: modelPath, params: params)
     }
 
     func transcribe(
         audioURL: URL,
         binaryPath: String,
         modelPath: String,
-        language: String
+        language: String,
+        params: WhisperServerWorker.DecodingParams
     ) async throws -> String {
         let serverPath = Self.serverBinary(forCLIPath: binaryPath)
-        try await worker.ensureRunning(serverBinaryPath: serverPath, modelPath: modelPath)
+        try await worker.ensureRunning(serverBinaryPath: serverPath, modelPath: modelPath, params: params)
         return try await worker.transcribe(audioURL: audioURL, language: language)
     }
 

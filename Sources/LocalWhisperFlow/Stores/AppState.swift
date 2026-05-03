@@ -24,15 +24,19 @@ final class AppState: ObservableObject {
     private var levelCancellable: AnyCancellable?
     private var micSettingCancellable: AnyCancellable?
     private var triggerSettingCancellable: AnyCancellable?
+    private var presetSettingCancellable: AnyCancellable?
+    private var modelSettingCancellable: AnyCancellable?
     private var accessibilityPollTimer: Timer?
 
     init(settings: SettingsStore) {
         self.settings = settings
         audioRecorder.preferredDeviceUID = settings.preferredMicUID.isEmpty ? nil : settings.preferredMicUID
-        PushToTalkService.setTrigger(PushToTalkTrigger.byID(settings.pushToTalkTriggerID))
+        PushToTalkService.setTrigger(AppState.resolveTrigger(settings))
         observeAudioLevel()
         observeMicSetting()
         observeTriggerSetting()
+        observePresetSetting()
+        observeModelSetting()
         refreshAccessibilityStatus()
         startPushToTalk()
         scheduleWarmup()
@@ -120,10 +124,11 @@ final class AppState: ObservableObject {
         isServerReady = false
         let cliPath = settings.whisperBinaryPath
         let modelPath = settings.modelPath
+        let params = currentDecodingParams
         isWarmingUp = true
         warmupTask = Task { [weak self] in
             do {
-                try await self?.whisperService.warmup(cliBinaryPath: cliPath, modelPath: modelPath)
+                try await self?.whisperService.warmup(cliBinaryPath: cliPath, modelPath: modelPath, params: params)
                 await MainActor.run {
                     guard let self else { return }
                     self.isWarmingUp = false
@@ -137,6 +142,15 @@ final class AppState: ObservableObject {
                 }
             }
         }
+    }
+
+    private var currentDecodingParams: WhisperServerWorker.DecodingParams {
+        let preset = settings.performancePreset
+        return .init(
+            beamSize: preset.beamSize,
+            bestOf: preset.bestOf,
+            audioContext: preset.audioContext
+        )
     }
 
     func shutdown() async {
@@ -176,12 +190,54 @@ final class AppState: ObservableObject {
             }
     }
 
-    private func observeTriggerSetting() {
-        triggerSettingCancellable = settings.$pushToTalkTriggerID
+    private func observePresetSetting() {
+        presetSettingCancellable = settings.$performancePresetID
+            .dropFirst()
             .receive(on: RunLoop.main)
-            .sink { id in
-                PushToTalkService.setTrigger(PushToTalkTrigger.byID(id))
+            .sink { [weak self] _ in
+                self?.scheduleWarmup()
             }
+    }
+
+    private func observeModelSetting() {
+        modelSettingCancellable = settings.$modelPath
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.scheduleWarmup()
+            }
+    }
+
+    private func observeTriggerSetting() {
+        let updateTrigger: () -> Void = { [weak self] in
+            guard let self else { return }
+            PushToTalkService.setTrigger(AppState.resolveTrigger(self.settings))
+        }
+        triggerSettingCancellable = Publishers.MergeMany(
+            settings.$pushToTalkTriggerID.map { _ in () }.eraseToAnyPublisher(),
+            settings.$customTriggerKeycode.map { _ in () }.eraseToAnyPublisher(),
+            settings.$customTriggerFlags.map { _ in () }.eraseToAnyPublisher()
+        )
+        .receive(on: RunLoop.main)
+        .sink { _ in updateTrigger() }
+    }
+
+    static func resolveTrigger(_ settings: SettingsStore) -> PushToTalkTrigger {
+        if settings.pushToTalkTriggerID == "custom",
+           settings.customTriggerKeycode >= 0,
+           settings.customTriggerFlags != 0 {
+            let label = settings.customTriggerLabel.isEmpty
+                ? PushToTalkTrigger.describe(keycode: settings.customTriggerKeycode,
+                                             flags: settings.customTriggerFlags)
+                : settings.customTriggerLabel
+            return PushToTalkTrigger.make(
+                id: "custom",
+                label: label,
+                keycode: settings.customTriggerKeycode,
+                flags: settings.customTriggerFlags
+            )
+        }
+        return PushToTalkTrigger.byID(settings.pushToTalkTriggerID)
     }
 
     private func startAccessibilityPolling() {
@@ -223,7 +279,8 @@ final class AppState: ObservableObject {
                 audioURL: audioURL,
                 binaryPath: settings.whisperBinaryPath,
                 modelPath: settings.modelPath,
-                language: settings.language
+                language: settings.language,
+                params: currentDecodingParams
             )
 
             lastTranscript = transcript

@@ -30,11 +30,18 @@ actor WhisperServerWorker {
     private let host = "127.0.0.1"
     let port: Int
 
+    struct DecodingParams: Equatable {
+        let beamSize: Int
+        let bestOf: Int
+        let audioContext: Int
+    }
+
     private var process: Process?
     private var stdoutPipe: Pipe?
     private var stderrPipe: Pipe?
     private var currentBinary: String?
     private var currentModel: String?
+    private var currentParams: DecodingParams?
     private var readyTask: Task<Void, Error>?
     private var stderrBuffer = ""
 
@@ -46,17 +53,18 @@ actor WhisperServerWorker {
         process?.isRunning == true
     }
 
-    func ensureRunning(serverBinaryPath: String, modelPath: String) async throws {
+    func ensureRunning(serverBinaryPath: String, modelPath: String, params: DecodingParams) async throws {
         if let proc = process,
            proc.isRunning,
            currentBinary == serverBinaryPath,
-           currentModel == modelPath {
+           currentModel == modelPath,
+           currentParams == params {
             try await waitReady()
             return
         }
 
         await stop()
-        try start(serverBinaryPath: serverBinaryPath, modelPath: modelPath)
+        try start(serverBinaryPath: serverBinaryPath, modelPath: modelPath, params: params)
         try await waitReady()
     }
 
@@ -127,10 +135,11 @@ actor WhisperServerWorker {
         stderrPipe = nil
         currentBinary = nil
         currentModel = nil
+        currentParams = nil
         stderrBuffer = ""
     }
 
-    private func start(serverBinaryPath: String, modelPath: String) throws {
+    private func start(serverBinaryPath: String, modelPath: String, params: DecodingParams) throws {
         let fm = FileManager.default
         guard fm.isExecutableFile(atPath: serverBinaryPath) else {
             throw WhisperError.missingBinary(serverBinaryPath)
@@ -146,7 +155,10 @@ actor WhisperServerWorker {
             "--host", host,
             "--port", String(port),
             "-nt",
-            "-fa"
+            "-fa",
+            "-bs", String(params.beamSize),
+            "-bo", String(params.bestOf),
+            "-ac", String(params.audioContext)
         ]
         let stdout = Pipe()
         let stderr = Pipe()
@@ -170,6 +182,7 @@ actor WhisperServerWorker {
         stderrPipe = stderr
         currentBinary = serverBinaryPath
         currentModel = modelPath
+        currentParams = params
         stderrBuffer = ""
 
         let host = self.host
