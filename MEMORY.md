@@ -4,7 +4,7 @@
 - [domain] 2026-05-02 Scelto whisper.cpp come motore locale invece di Python/faster-whisper per stabilita e distribuibilita.
 - [domain] 2026-05-02 Scelto Whisper Large V3 (non Turbo) per accuratezza. Path default modello: `~/Library/Application Support/LocalWhisper/Models/ggml-large-v3.bin`.
 - [domain] 2026-05-02 Scelto MVP Control hold push-to-talk → transcribe → clipboard/paste. Streaming realtime, VAD e Core ML rimandati.
-- [domain] 2026-05-02 Progetto vive sotto iCloud Drive: `/Users/edoardozedda/Library/Mobile Documents/com~apple~CloudDocs/Progetti/LocalWhisper`. Il MODELLO invece NON deve stare in iCloud (vedi gotcha sotto).
+- [domain] 2026-05-02 Progetto vive sotto iCloud Drive: `~/Library/Mobile Documents/com~apple~CloudDocs/Progetti/LocalWhisper`. Il MODELLO invece NON deve stare in iCloud (vedi gotcha sotto).
 - [domain] 2026-05-02 Architettura runtime: `whisper-server` persistente come child process del bundle. App parla via HTTP `127.0.0.1:18642`. Modello caricato una sola volta al warmup; ogni dictation successiva ~2.6 s su M3 con Metal + Accelerate per audio 11 s.
 - [domain] 2026-05-02 whisper.cpp viene buildato STATICO (`-DBUILD_SHARED_LIBS=OFF`) con `-DGGML_METAL=ON -DGGML_METAL_EMBED_LIBRARY=ON -DGGML_ACCELERATE=ON -DGGML_BLAS=ON -DGGML_BLAS_VENDOR=Apple`. Eseguibili autocontenuti, non si rompono se la cartella viene spostata.
 

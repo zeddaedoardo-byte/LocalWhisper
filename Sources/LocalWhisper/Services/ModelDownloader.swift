@@ -101,21 +101,54 @@ final class ModelDownloader: NSObject, ObservableObject {
 
         phase = .extractingCoreML
         progress = 0
-        try extractZip(at: zipDestination, into: modelsDir)
+        try await Self.extractZip(at: zipDestination, into: modelsDir)
         try? FileManager.default.removeItem(at: zipDestination)
     }
 
-    private func extractZip(at zipURL: URL, into destination: URL) throws {
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
-        proc.arguments = ["-q", "-o", zipURL.path, "-d", destination.path]
-        proc.standardOutput = Pipe()
-        proc.standardError = Pipe()
-        try proc.run()
-        proc.waitUntilExit()
-        guard proc.terminationStatus == 0 else {
-            throw NSError(domain: "ModelDownloader", code: 100,
-                          userInfo: [NSLocalizedDescriptionKey: "Estrazione Core ML fallita (exit \(proc.terminationStatus))"])
+    /// Runs unzip on a background thread so the MainActor (and the UI) stays
+    /// responsive during extraction. Pipes are drained continuously so the
+    /// child cannot block on a full stdout/stderr buffer.
+    nonisolated private static func extractZip(at zipURL: URL, into destination: URL) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let proc = Process()
+                proc.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+                proc.arguments = ["-q", "-o", zipURL.path, "-d", destination.path]
+
+                let stdout = Pipe()
+                let stderr = Pipe()
+                proc.standardOutput = stdout
+                proc.standardError = stderr
+                stdout.fileHandleForReading.readabilityHandler = { handle in
+                    _ = handle.availableData
+                }
+                stderr.fileHandleForReading.readabilityHandler = { handle in
+                    _ = handle.availableData
+                }
+
+                do {
+                    try proc.run()
+                } catch {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                proc.waitUntilExit()
+
+                stdout.fileHandleForReading.readabilityHandler = nil
+                stderr.fileHandleForReading.readabilityHandler = nil
+
+                guard proc.terminationStatus == 0 else {
+                    continuation.resume(
+                        throwing: NSError(
+                            domain: "ModelDownloader",
+                            code: 100,
+                            userInfo: [NSLocalizedDescriptionKey: "Estrazione Core ML fallita (exit \(proc.terminationStatus))"]
+                        )
+                    )
+                    return
+                }
+                continuation.resume()
+            }
         }
     }
 

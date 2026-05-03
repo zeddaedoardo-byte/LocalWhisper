@@ -131,15 +131,24 @@ final class AppState: ObservableObject {
             hudController.update(state: .hidden)
             stopEscapeMonitor()
         } else {
-            // .transcribing — cancel the inflight HTTP request and bounce the
-            // whisper-server so any half-running inference stops too.
+            // .transcribing — cancel the inflight HTTP request AND kill the
+            // whisper-server. Cancelling only the HTTP client does not stop
+            // server-side inference once it has started; the server keeps
+            // computing until completion. Forcing a shutdown of the worker
+            // process is the only way to actually abort.
             transcribeTask?.cancel()
             transcribeTask = nil
             status = .idle
             lastError = nil
             hudController.update(state: .hidden)
             stopEscapeMonitor()
-            scheduleWarmup()
+            let service = whisperService
+            Task { [weak self] in
+                await service.shutdown()
+                await MainActor.run {
+                    self?.scheduleWarmup()
+                }
+            }
         }
     }
 

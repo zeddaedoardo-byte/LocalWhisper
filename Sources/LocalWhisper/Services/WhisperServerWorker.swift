@@ -118,15 +118,7 @@ actor WhisperServerWorker {
 
         if let proc = process {
             let pid = proc.processIdentifier
-            if proc.isRunning {
-                proc.terminate()
-                for _ in 0..<30 where proc.isRunning {
-                    try? await Task.sleep(nanoseconds: 100_000_000)
-                }
-                if proc.isRunning {
-                    proc.interrupt()
-                }
-            }
+            await Self.terminate(process: proc, pid: pid)
             WhisperServerWorker.unregisterPID(pid)
         }
 
@@ -137,6 +129,30 @@ actor WhisperServerWorker {
         currentModel = nil
         currentParams = nil
         stderrBuffer = ""
+    }
+
+    private static func terminate(process proc: Process, pid: pid_t) async {
+        guard proc.isRunning else { return }
+
+        // 1. SIGTERM via Process.terminate(), wait up to 3 s.
+        proc.terminate()
+        for _ in 0..<30 where proc.isRunning {
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+        if !proc.isRunning { return }
+
+        // 2. SIGINT via Process.interrupt(), wait up to 1.5 s.
+        proc.interrupt()
+        for _ in 0..<15 where proc.isRunning {
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+        if !proc.isRunning { return }
+
+        // 3. Last resort: SIGKILL. The process cannot ignore this.
+        kill(pid, SIGKILL)
+        for _ in 0..<20 where proc.isRunning {
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
     }
 
     private func start(serverBinaryPath: String, modelPath: String, params: DecodingParams) throws {

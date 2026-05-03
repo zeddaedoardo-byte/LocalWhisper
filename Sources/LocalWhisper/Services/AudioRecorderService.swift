@@ -248,25 +248,16 @@ final class AudioRecorderService: NSObject, ObservableObject {
             Task { @MainActor in service.levelDB = db }
         }
 
+        // Hold the lock for the whole convert+write so stopRecording cannot
+        // return mid-write and let the consumer read a truncated WAV.
         lock.lock()
-        let recording: Bool
-        let file: AVAudioFile?
-        let converter: AVAudioConverter?
-        let target: AVAudioFormat?
-        if let service = weakService.value {
-            recording = service.isRecording
-            file = service.audioFile
-            converter = service.converter
-            target = service.targetFormat
-        } else {
-            recording = false
-            file = nil
-            converter = nil
-            target = nil
-        }
-        lock.unlock()
+        defer { lock.unlock() }
 
-        guard recording, let file, let converter, let target else { return }
+        guard let service = weakService.value,
+              service.isRecording,
+              let file = service.audioFile,
+              let converter = service.converter,
+              let target = service.targetFormat else { return }
 
         let inputFrames = AVAudioFrameCount(buffer.frameLength)
         let ratio = target.sampleRate / buffer.format.sampleRate
