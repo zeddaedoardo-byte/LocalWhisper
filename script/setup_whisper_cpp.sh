@@ -55,9 +55,25 @@ if [[ "$ARCH" == "arm64" && ! -d "$ENCODER_DIR" ]]; then
   fi
 fi
 
+# Always fetch the silero-v5 VAD model so whisper-server can trim leading /
+# trailing silence at inference time. ~2 MB.
+VAD_NAME="ggml-silero-v5.1.2.bin"
+VAD_FILE="$MODEL_DIR/$VAD_NAME"
+if [[ ! -f "$VAD_FILE" ]]; then
+  VAD_URL="https://huggingface.co/ggml-org/whisper-vad/resolve/main/$VAD_NAME"
+  echo "Downloading VAD model from $VAD_URL"
+  if ! curl --fail -L -o "$VAD_FILE" "$VAD_URL"; then
+    echo "WARNING: Could not fetch silero VAD model. The app will run without VAD trimming."
+    rm -f "$VAD_FILE"
+  fi
+fi
+
 echo "whisper-cli:    $WHISPER_DIR/build/bin/whisper-cli"
 echo "whisper-server: $WHISPER_DIR/build/bin/whisper-server"
 echo "model:          $MODEL_FILE"
 if [[ -d "$ENCODER_DIR" ]]; then
   echo "core ml:        $ENCODER_DIR"
+fi
+if [[ -f "$VAD_FILE" ]]; then
+  echo "vad model:      $VAD_FILE"
 fi

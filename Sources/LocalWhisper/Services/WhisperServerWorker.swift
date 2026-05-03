@@ -164,9 +164,7 @@ actor WhisperServerWorker {
             throw WhisperError.missingModel(modelPath)
         }
 
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: serverBinaryPath)
-        proc.arguments = [
+        var arguments: [String] = [
             "-m", modelPath,
             "--host", host,
             "--port", String(port),
@@ -176,6 +174,23 @@ actor WhisperServerWorker {
             "-bo", String(params.bestOf),
             "-ac", String(params.audioContext)
         ]
+
+        // If a silero VAD model is present in the same directory as the gguf,
+        // enable Voice Activity Detection so the encoder receives speech-only
+        // input. This eliminates silence-padding hallucinations on short
+        // utterances and shaves the encoder cost a bit on top.
+        let modelDir = (modelPath as NSString).deletingLastPathComponent
+        let vadPath = (modelDir as NSString).appendingPathComponent("ggml-silero-v5.1.2.bin")
+        if fm.fileExists(atPath: vadPath) {
+            arguments.append(contentsOf: [
+                "--vad",
+                "--vad-model", vadPath
+            ])
+        }
+
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: serverBinaryPath)
+        proc.arguments = arguments
         let stdout = Pipe()
         let stderr = Pipe()
         proc.standardOutput = stdout
