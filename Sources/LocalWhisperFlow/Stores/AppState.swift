@@ -19,9 +19,13 @@ final class AppState: ObservableObject {
     private let clipboardService = ClipboardService()
     private let pasteService = PasteService()
     private let pushToTalkService = PushToTalkService()
+    private let escapeMonitor = EscapeKeyMonitor()
     private var isPushToTalkHeld = false
     private var isStartingPushToTalkRecording = false
     private var warmupTask: Task<Void, Never>?
+    private var transcribeTask: Task<Void, Never>?
+    private var lastAudioURL: URL?
+    private var didAbort = false
     private var levelCancellable: AnyCancellable?
     private var micSettingCancellable: AnyCancellable?
     private var triggerSettingCancellable: AnyCancellable?
@@ -103,8 +107,51 @@ final class AppState: ObservableObject {
         isPushToTalkHeld = false
 
         if status == .recording {
-            Task { await stopAndTranscribe() }
+            transcribeTask?.cancel()
+            transcribeTask = Task { [weak self] in
+                await self?.stopAndTranscribe()
+            }
         }
+    }
+
+    func abortInProgress() {
+        guard status == .recording || status == .transcribing else { return }
+
+        didAbort = true
+        SoundService.shared.playStopListening()
+
+        if status == .recording {
+            isPushToTalkHeld = false
+            isStartingPushToTalkRecording = false
+            if let url = try? audioRecorder.stopRecording() {
+                try? FileManager.default.removeItem(at: url)
+            }
+            status = .idle
+            lastError = nil
+            hudController.update(state: .hidden)
+            stopEscapeMonitor()
+        } else {
+            // .transcribing — cancel the inflight HTTP request and bounce the
+            // whisper-server so any half-running inference stops too.
+            transcribeTask?.cancel()
+            transcribeTask = nil
+            status = .idle
+            lastError = nil
+            hudController.update(state: .hidden)
+            stopEscapeMonitor()
+            scheduleWarmup()
+        }
+    }
+
+    private func startEscapeMonitor() {
+        guard !escapeMonitor.isActive else { return }
+        escapeMonitor.start { [weak self] in
+            self?.abortInProgress()
+        }
+    }
+
+    private func stopEscapeMonitor() {
+        escapeMonitor.stop()
     }
 
     func resetPushToTalk() {
@@ -319,10 +366,12 @@ final class AppState: ObservableObject {
         do {
             lastError = nil
             lastTranscript = ""
+            didAbort = false
             _ = try await audioRecorder.startRecording()
             SoundService.shared.playStartListening()
             status = .recording
             hudController.update(state: .recording)
+            startEscapeMonitor()
         } catch {
             fail(error)
         }
@@ -335,6 +384,8 @@ final class AppState: ObservableObject {
             if let url = pendingAudioURL {
                 if transcribeSucceeded {
                     try? FileManager.default.removeItem(at: url)
+                } else if didAbort {
+                    try? FileManager.default.removeItem(at: url)
                 } else {
                     keepAsLastFailedAudio(url)
                 }
@@ -346,6 +397,7 @@ final class AppState: ObservableObject {
             SoundService.shared.playStopListening()
             status = .transcribing
             hudController.update(state: .transcribing)
+            startEscapeMonitor()
 
             let transcript = try await whisperService.transcribe(
                 audioURL: audioURL,
@@ -372,6 +424,7 @@ final class AppState: ObservableObject {
 
             isServerReady = true
             status = .completed
+            stopEscapeMonitor()
             let preview = String(transcript.prefix(72))
             if let pasteWarning {
                 hudController.update(state: .error(pasteWarning))
@@ -379,6 +432,11 @@ final class AppState: ObservableObject {
                 hudController.update(state: .completed(preview))
             }
         } catch {
+            if didAbort {
+                didAbort = false
+                return
+            }
+            stopEscapeMonitor()
             fail(error)
         }
     }
