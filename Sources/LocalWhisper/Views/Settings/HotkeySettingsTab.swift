@@ -13,7 +13,7 @@ struct HotkeySettingsTab: View {
     var body: some View {
         Form {
             Section {
-                Picker("Trigger predefinito", selection: $settings.pushToTalkTriggerID) {
+                Picker("Default trigger", selection: $settings.pushToTalkTriggerID) {
                     ForEach(PushToTalkTrigger.all) { trigger in
                         Text(trigger.label).tag(trigger.id)
                     }
@@ -31,7 +31,7 @@ struct HotkeySettingsTab: View {
                 }
                 .padding(.vertical, 12)
 
-                Button(capturing ? "In ascolto... premi e rilascia" : "Cattura tasto da tastiera") {
+                Button(capturing ? "Listening… press and release" : "Capture key from keyboard") {
                     if capturing {
                         cancelCapture()
                     } else {
@@ -40,7 +40,7 @@ struct HotkeySettingsTab: View {
                 }
                 .keyboardShortcut(.defaultAction)
 
-                Text("Premi e tieni il tasto (o la combinazione) che vuoi usare. Rilascia per confermare.")
+                Text("Press and hold the key (or combo) you want. Release to confirm.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } header: {
@@ -50,7 +50,7 @@ struct HotkeySettingsTab: View {
             if isCustomConfigured {
                 Section {
                     HStack {
-                        Text("Hotkey corrente")
+                        Text("Current hotkey")
                         Spacer()
                         Text(customLabel)
                             .foregroundStyle(.secondary)
@@ -62,7 +62,7 @@ struct HotkeySettingsTab: View {
                             .font(.caption.monospaced())
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Button("Rimuovi custom") {
+                        Button("Remove custom") {
                             clearCustom()
                         }
                     }

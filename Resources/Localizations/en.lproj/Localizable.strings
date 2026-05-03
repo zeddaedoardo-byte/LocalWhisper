@@ -1,0 +1,136 @@
+/* Status / HUD */
+"Ready" = "Ready";
+"Recording" = "Recording";
+"Transcribing" = "Transcribing";
+"Error" = "Error";
+"Hold %@ to dictate" = "Hold %@ to dictate";
+"Loading model…" = "Loading model…";
+"Server stopped" = "Server stopped";
+"Accessibility not granted" = "Accessibility not granted";
+
+/* Menu bar */
+"Last transcript" = "Last transcript";
+"Copy transcript" = "Copy transcript";
+"Auto Paste" = "Auto Paste";
+"Grant Accessibility…" = "Grant Accessibility…";
+"Settings…" = "Settings…";
+"Quit LocalWhisper" = "Quit LocalWhisper";
+"Quit" = "Quit";
+"Start Recording" = "Start Recording";
+"Stop and Transcribe" = "Stop and Transcribe";
+"Transcribing…" = "Transcribing…";
+
+/* Settings tabs */
+"Whisper" = "Whisper";
+"Microphone" = "Microphone";
+"Hotkey" = "Hotkey";
+"Output" = "Output";
+"Advanced" = "Advanced";
+"About" = "About";
+
+/* Whisper settings */
+"Performance" = "Performance";
+"Preset" = "Preset";
+"Quality (most accurate)" = "Quality (most accurate)";
+"Balanced" = "Balanced";
+"Speed (fastest)" = "Speed (fastest)";
+"Quality preset description" = "Wide beam search, best accuracy. Recommended on M2/M3/M4 with 16+ GB RAM.";
+"Balanced preset description" = "Compromise between quality and response time. Default.";
+"Speed preset description" = "Reduced beam + truncated audio context. Ideal on Intel Mac or low-RAM machines.";
+"Beam size" = "Beam size";
+"Best of" = "Best of";
+"Audio context" = "Audio context";
+"full" = "full";
+"Suggested for your Mac: %@" = "Suggested for your Mac: %@";
+"Apply" = "Apply";
+
+"Model" = "Model";
+"Active" = "Active";
+"In use" = "In use";
+"Use" = "Use";
+"Cancel" = "Cancel";
+"Download (%lld MB)" = "Download (%lld MB)";
+"Download (%lld MB + %lld MB Core ML)" = "Download (%lld MB + %lld MB Core ML)";
+"Download Core ML (%lld MB)" = "Download Core ML (%lld MB)";
+"Core ML encoder installed (Neural Engine)" = "Core ML encoder installed (Neural Engine)";
+"Core ML encoder not installed" = "Core ML encoder not installed";
+"Models live in ~/Library/Application Support/LocalWhisper/Models. They replace the active model only after the download completes." = "Models live in ~/Library/Application Support/LocalWhisper/Models. They replace the active model only after the download completes.";
+"Delete %@?" = "Delete %@?";
+"Delete %@ confirmation" = "The model file and any Core ML encoder will be removed, freeing about %lld MB. You can re-download it any time.";
+"Delete" = "Delete";
+"Remove from disk" = "Remove from disk";
+"Whisper engine" = "Whisper engine";
+"whisper-server is auto-detected next to whisper-cli." = "whisper-server is auto-detected next to whisper-cli.";
+
+"Language" = "Language";
+"Auto-detect" = "Auto-detect";
+"Whisper auto-detects the language for each dictation." = "Whisper auto-detects the language for each dictation.";
+"Manual code" = "Manual code";
+"Custom: %@" = "Custom: %@";
+
+"Advanced (paths)" = "Advanced (paths)";
+"whisper-cli binary" = "whisper-cli binary";
+"Active model path" = "Active model path";
+"Restore defaults" = "Restore defaults";
+
+/* Microphone */
+"Input device" = "Input device";
+"System default" = "System default";
+"Test microphone (1.5s)" = "Test microphone (1.5s)";
+"Listening…" = "Listening…";
+"Speak normally for ~1 second." = "Speak normally for ~1 second.";
+"Microphone is capturing audio." = "Microphone is capturing audio.";
+"No audio detected. Check the device and macOS permissions." = "No audio detected. Check the device and macOS permissions.";
+"Refresh devices" = "Refresh devices";
+"Peak: %lld dB · %@" = "Peak: %lld dB · %@";
+"Silent" = "Silent";
+"Low" = "Low";
+"Good" = "Good";
+"Loud" = "Loud";
+"Choose the input device used for dictation. The test records 1.5s and reports the peak level." = "Choose the input device used for dictation. The test records 1.5s and reports the peak level.";
+
+/* Hotkey */
+"Push-to-talk" = "Push-to-talk";
+"Default trigger" = "Default trigger";
+"Capture key from keyboard" = "Capture key from keyboard";
+"Listening… press and release" = "Listening… press and release";
+"Press and hold the key (or combo) you want. Release to confirm." = "Press and hold the key (or combo) you want. Release to confirm.";
+"Current hotkey" = "Current hotkey";
+"Remove custom" = "Remove custom";
+
+/* Output */
+"Copy transcript to clipboard" = "Copy transcript to clipboard";
+"Paste into active app" = "Paste into active app";
+"Start/stop sounds" = "Start/stop sounds";
+"Auto-paste needs Accessibility. Without it, the transcript stays in the clipboard." = "Auto-paste needs Accessibility. Without it, the transcript stays in the clipboard.";
+"Permissions" = "Permissions";
+"Accessibility granted" = "Accessibility granted";
+"Accessibility missing" = "Accessibility missing";
+"Re-check" = "Re-check";
+"Grant…" = "Grant…";
+"Startup" = "Startup";
+"Launch at login" = "Launch at login";
+"If recording fails, check System Settings → Login Items." = "If recording fails, check System Settings → Login Items.";
+
+/* Advanced */
+"Server" = "Server";
+"Server endpoint" = "Server endpoint";
+"Model path" = "Model path";
+"Restart Whisper server" = "Restart Whisper server";
+"Diagnostics" = "Diagnostics";
+"Push-to-talk log" = "Push-to-talk log";
+"Reveal log in Finder" = "Reveal log in Finder";
+"Recovery" = "Recovery";
+"Last failed audio" = "Last failed audio";
+"Reveal in Finder" = "Reveal in Finder";
+"No failed audio retained." = "No failed audio retained.";
+"When a transcription fails the WAV is kept here so you can recover it. Successful transcriptions are deleted immediately." = "When a transcription fails the WAV is kept here so you can recover it. Successful transcriptions are deleted immediately.";
+
+/* About */
+"Version %@" = "Version %@";
+"Offline voice transcription on Apple Silicon with Whisper Large V3." = "Offline voice transcription on Apple Silicon with Whisper Large V3.";
+
+/* Downloader */
+"Model" = "Model";
+"Core ML encoder" = "Core ML encoder";
+"Extracting Core ML" = "Extracting Core ML";

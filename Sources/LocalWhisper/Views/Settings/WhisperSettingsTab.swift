@@ -1,9 +1,9 @@
 import AppKit
 import SwiftUI
 
-private struct LanguageOption: Identifiable, Hashable {
+private struct LanguageOption: Identifiable {
     let id: String
-    let label: String
+    let label: LocalizedStringKey
 }
 
 private let kLanguageCatalog: [LanguageOption] = [
@@ -53,18 +53,18 @@ struct WhisperSettingsTab: View {
                         .foregroundStyle(.secondary).monospaced()
                 }
                 LabeledContent("Audio context") {
-                    Text(currentPreset.audioContext == 0 ? "completo" : "\(currentPreset.audioContext)")
+                    audioContextLabel
                         .foregroundStyle(.secondary).monospaced()
                 }
 
                 HStack {
                     Image(systemName: "lightbulb")
                         .foregroundStyle(.yellow)
-                    Text("Suggerito per il tuo Mac: \(suggestedPresetLabel)")
+                    Text("Suggested for your Mac: \(suggestedPresetLabel)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Button("Applica") {
+                    Button("Apply") {
                         settings.performancePreset = HardwareProfile.current.suggestedPreset
                     }
                     .controlSize(.small)
@@ -85,12 +85,12 @@ struct WhisperSettingsTab: View {
                             Spacer()
 
                             if isCurrentModel(model) {
-                                Label("Attivo", systemImage: "checkmark.circle.fill")
+                                Label("Active", systemImage: "checkmark.circle.fill")
                                     .foregroundStyle(.green)
                                     .labelStyle(.iconOnly)
-                                    .help("In uso")
+                                    .help("In use")
                             } else if isModelInstalled(model) {
-                                Button("Usa") { useModel(model) }
+                                Button("Use") { useModel(model) }
                                     .controlSize(.small)
                                 Button {
                                     modelPendingDeletion = model
@@ -98,7 +98,7 @@ struct WhisperSettingsTab: View {
                                     Image(systemName: "trash")
                                 }
                                 .buttonStyle(.borderless)
-                                .help("Elimina dal disco")
+                                .help("Remove from disk")
                             } else if downloader.inFlightModelID == model.id {
                                 VStack(alignment: .trailing, spacing: 2) {
                                     ProgressView(value: downloader.progress).frame(width: 110)
@@ -106,7 +106,7 @@ struct WhisperSettingsTab: View {
                                         .font(.caption2)
                                         .foregroundStyle(.secondary)
                                 }
-                                Button("Annulla") { downloader.cancel() }
+                                Button("Cancel") { downloader.cancel() }
                                     .controlSize(.small)
                             } else {
                                 Button(downloadButtonLabel(for: model)) {
@@ -121,12 +121,12 @@ struct WhisperSettingsTab: View {
                             HStack(spacing: 6) {
                                 Image(systemName: hasCoreML(model) ? "cpu.fill" : "cpu")
                                     .foregroundStyle(hasCoreML(model) ? .green : .secondary)
-                                Text(hasCoreML(model) ? "Core ML encoder installato (Neural Engine)" : "Core ML encoder non installato")
+                                coreMLLabel(installed: hasCoreML(model))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                 Spacer()
                                 if !hasCoreML(model), downloader.inFlightModelID != model.id {
-                                    Button("Scarica (\(model.coreMLEncoderApproxMB ?? 0) MB)") {
+                                    Button("Download Core ML (\(model.coreMLEncoderApproxMB ?? 0) MB)") {
                                         Task { await downloadCoreMLOnly(model) }
                                     }
                                     .controlSize(.small)
@@ -144,39 +144,39 @@ struct WhisperSettingsTab: View {
                         .foregroundStyle(.red)
                 }
             } header: {
-                Text("Modello")
+                Text("Model")
             } footer: {
-                Text("I modelli vengono scaricati in ~/Library/Application Support/LocalWhisper/Models e sostituiscono il modello attivo solo dopo il download completo.")
+                Text("Models live in ~/Library/Application Support/LocalWhisper/Models. They replace the active model only after the download completes.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             Section {
-                Picker("Lingua", selection: languageBinding) {
+                Picker("Language", selection: languageBinding) {
                     ForEach(kLanguageCatalog) { option in
                         Text(option.label).tag(option.id)
                     }
                     if !catalogContainsCurrentLanguage {
-                        Text("Personalizzata: \(settings.language)").tag(settings.language)
+                        Text("Custom: \(settings.language)").tag(settings.language)
                     }
                 }
                 .pickerStyle(.menu)
 
                 if isAuto {
-                    Text("Whisper rileva la lingua automaticamente per ogni dettatura.")
+                    Text("Whisper auto-detects the language for each dictation.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 
                 HStack {
-                    Text("Codice manuale")
-                    TextField("es. it, en, auto", text: $settings.language)
+                    Text("Manual code")
+                    TextField("e.g. it, en, auto", text: $settings.language)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 140)
                 }
                 .font(.caption)
             } header: {
-                Text("Lingua")
+                Text("Language")
             }
 
             Section {
@@ -186,29 +186,52 @@ struct WhisperSettingsTab: View {
                     canChooseDirectories: false
                 )
                 PathPickerRow(
-                    title: "Path modello attivo",
+                    title: "Active model path",
                     path: $settings.modelPath,
                     canChooseDirectories: false
                 )
-                Button("Ripristina default") {
+                Button("Restore defaults") {
                     settings.resetDefaultPaths()
                 }
             } header: {
-                Text("Avanzato (path)")
+                Text("Advanced (paths)")
             }
         }
         .formStyle(.grouped)
         .padding(20)
         .alert(item: $modelPendingDeletion) { model in
             Alert(
-                title: Text("Eliminare \(model.label)?"),
-                message: Text("Verranno cancellati il file modello e l'eventuale Core ML encoder, liberando ~\(spaceUsed(by: model)) MB. Puoi sempre riscaricarlo."),
-                primaryButton: .destructive(Text("Elimina")) {
+                title: Text("Delete \(model.label)?"),
+                message: Text(deletionMessage(for: model)),
+                primaryButton: .destructive(Text("Delete")) {
                     deleteModel(model)
                 },
-                secondaryButton: .cancel(Text("Annulla"))
+                secondaryButton: .cancel(Text("Cancel"))
             )
         }
+    }
+
+    @ViewBuilder
+    private var audioContextLabel: some View {
+        if currentPreset.audioContext == 0 {
+            Text("full")
+        } else {
+            Text("\(currentPreset.audioContext)")
+        }
+    }
+
+    @ViewBuilder
+    private func coreMLLabel(installed: Bool) -> some View {
+        if installed {
+            Text("Core ML encoder installed (Neural Engine)")
+        } else {
+            Text("Core ML encoder not installed")
+        }
+    }
+
+    private func deletionMessage(for model: WhisperModelInfo) -> String {
+        let format = String(localized: "Delete %@ confirmation")
+        return String(format: format, "\(spaceUsed(by: model))")
     }
 
     // MARK: - Helpers
@@ -249,12 +272,12 @@ struct WhisperSettingsTab: View {
         FileManager.default.fileExists(atPath: coreMLDirURL(for: model).path)
     }
 
-    private func downloadButtonLabel(for model: WhisperModelInfo) -> String {
+    private func downloadButtonLabel(for model: WhisperModelInfo) -> LocalizedStringKey {
         let modelMB = model.approxMB
         if isAppleSilicon, let coreMB = model.coreMLEncoderApproxMB {
-            return "Scarica (\(modelMB) MB + \(coreMB) MB Core ML)"
+            return "Download (\(modelMB) MB + \(coreMB) MB Core ML)"
         }
-        return "Scarica (\(modelMB) MB)"
+        return "Download (\(modelMB) MB)"
     }
 
     private func isModelInstalled(_ model: WhisperModelInfo) -> Bool {

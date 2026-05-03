@@ -7,7 +7,8 @@ struct MicrophoneSettingsTab: View {
     @State private var devices: [AudioInputDevice] = []
     @State private var testRunning = false
     @State private var testPeakDB: Float? = nil
-    @State private var testStatus: String = ""
+    @State private var testStatus: LocalizedStringKey = ""
+    @State private var hasTestStatus = false
 
     var body: some View {
         Form {
@@ -21,19 +22,22 @@ struct MicrophoneSettingsTab: View {
                 .pickerStyle(.menu)
 
                 HStack {
-                    Button(testRunning ? "Listening..." : "Test microphone (1.5s)") {
+                    Button(testRunning ? "Listening…" : "Test microphone (1.5s)") {
                         Task { await runTest() }
                     }
                     .disabled(testRunning)
 
                     if let db = testPeakDB {
-                        Text("Peak: \(Int(db.rounded())) dB · \(qualityLabel(db))")
+                        Text("Peak: \(Int(db.rounded())) dB · ")
+                            .foregroundStyle(qualityColor(db))
+                            .font(.callout.monospaced())
+                        + Text(qualityLabel(db))
                             .foregroundStyle(qualityColor(db))
                             .font(.callout.monospaced())
                     }
                 }
 
-                if !testStatus.isEmpty {
+                if hasTestStatus {
                     Text(testStatus)
                         .foregroundStyle(.secondary)
                         .font(.caption)
@@ -70,6 +74,7 @@ struct MicrophoneSettingsTab: View {
         testRunning = true
         testPeakDB = nil
         testStatus = "Speak normally for ~1 second."
+        hasTestStatus = true
         let peak = await appState.runMicLevelTest(seconds: 1.5)
         testPeakDB = peak
         testRunning = false
@@ -78,7 +83,7 @@ struct MicrophoneSettingsTab: View {
             : "No audio detected. Check the device and macOS permissions."
     }
 
-    private func qualityLabel(_ db: Float) -> String {
+    private func qualityLabel(_ db: Float) -> LocalizedStringKey {
         switch db {
         case ..<(-55): "Silent"
         case ..<(-30): "Low"

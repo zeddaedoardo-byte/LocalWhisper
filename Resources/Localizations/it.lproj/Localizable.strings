@@ -1,0 +1,136 @@
+/* Status / HUD */
+"Ready" = "Pronto";
+"Recording" = "Registrazione";
+"Transcribing" = "Trascrizione";
+"Error" = "Errore";
+"Hold %@ to dictate" = "Tieni %@ per dettare";
+"Loading model…" = "Caricamento modello…";
+"Server stopped" = "Server fermo";
+"Accessibility not granted" = "Accessibility non concessa";
+
+/* Menu bar */
+"Last transcript" = "Ultima trascrizione";
+"Copy transcript" = "Copia trascritto";
+"Auto Paste" = "Auto Paste";
+"Grant Accessibility…" = "Concedi Accessibility…";
+"Settings…" = "Impostazioni…";
+"Quit LocalWhisper" = "Esci da LocalWhisper";
+"Quit" = "Esci";
+"Start Recording" = "Avvia registrazione";
+"Stop and Transcribe" = "Ferma e trascrivi";
+"Transcribing…" = "Trascrizione…";
+
+/* Settings tabs */
+"Whisper" = "Whisper";
+"Microphone" = "Microfono";
+"Hotkey" = "Hotkey";
+"Output" = "Output";
+"Advanced" = "Avanzate";
+"About" = "Informazioni";
+
+/* Whisper settings */
+"Performance" = "Performance";
+"Preset" = "Preset";
+"Quality (most accurate)" = "Qualità (più accurato)";
+"Balanced" = "Bilanciato";
+"Speed (fastest)" = "Velocità (più rapido)";
+"Quality preset description" = "Beam search ampio, miglior accuratezza. Consigliato su M2/M3/M4 con 16+ GB RAM.";
+"Balanced preset description" = "Compromesso tra qualità e tempi di risposta. Default.";
+"Speed preset description" = "Beam ridotto + audio context troncato. Ideale su Intel Mac o RAM ridotta.";
+"Beam size" = "Beam size";
+"Best of" = "Best of";
+"Audio context" = "Audio context";
+"full" = "completo";
+"Suggested for your Mac: %@" = "Consigliato per il tuo Mac: %@";
+"Apply" = "Applica";
+
+"Model" = "Modello";
+"Active" = "Attivo";
+"In use" = "In uso";
+"Use" = "Usa";
+"Cancel" = "Annulla";
+"Download (%lld MB)" = "Scarica (%lld MB)";
+"Download (%lld MB + %lld MB Core ML)" = "Scarica (%lld MB + %lld MB Core ML)";
+"Download Core ML (%lld MB)" = "Scarica Core ML (%lld MB)";
+"Core ML encoder installed (Neural Engine)" = "Core ML encoder installato (Neural Engine)";
+"Core ML encoder not installed" = "Core ML encoder non installato";
+"Models live in ~/Library/Application Support/LocalWhisper/Models. They replace the active model only after the download completes." = "I modelli vivono in ~/Library/Application Support/LocalWhisper/Models. Sostituiscono il modello attivo solo dopo il download completo.";
+"Delete %@?" = "Eliminare %@?";
+"Delete %@ confirmation" = "Verranno cancellati il file modello e l'eventuale Core ML encoder, liberando ~%lld MB. Puoi sempre riscaricarlo.";
+"Delete" = "Elimina";
+"Remove from disk" = "Elimina dal disco";
+"Whisper engine" = "Whisper engine";
+"whisper-server is auto-detected next to whisper-cli." = "whisper-server viene cercato accanto a whisper-cli.";
+
+"Language" = "Lingua";
+"Auto-detect" = "Rilevamento automatico";
+"Whisper auto-detects the language for each dictation." = "Whisper rileva la lingua automaticamente per ogni dettatura.";
+"Manual code" = "Codice manuale";
+"Custom: %@" = "Personalizzata: %@";
+
+"Advanced (paths)" = "Avanzato (path)";
+"whisper-cli binary" = "Binario whisper-cli";
+"Active model path" = "Path del modello attivo";
+"Restore defaults" = "Ripristina default";
+
+/* Microphone */
+"Input device" = "Dispositivo di input";
+"System default" = "Predefinito di sistema";
+"Test microphone (1.5s)" = "Testa microfono (1.5s)";
+"Listening…" = "In ascolto…";
+"Speak normally for ~1 second." = "Parla normalmente per ~1 secondo.";
+"Microphone is capturing audio." = "Il microfono cattura audio.";
+"No audio detected. Check the device and macOS permissions." = "Nessun audio rilevato. Controlla il dispositivo e i permessi macOS.";
+"Refresh devices" = "Aggiorna dispositivi";
+"Peak: %lld dB · %@" = "Picco: %lld dB · %@";
+"Silent" = "Silenzio";
+"Low" = "Basso";
+"Good" = "Buono";
+"Loud" = "Alto";
+"Choose the input device used for dictation. The test records 1.5s and reports the peak level." = "Scegli il dispositivo di input per la dettatura. Il test registra 1.5s e mostra il picco.";
+
+/* Hotkey */
+"Push-to-talk" = "Push-to-talk";
+"Default trigger" = "Trigger predefinito";
+"Capture key from keyboard" = "Cattura tasto da tastiera";
+"Listening… press and release" = "In ascolto… premi e rilascia";
+"Press and hold the key (or combo) you want. Release to confirm." = "Premi e tieni il tasto (o la combinazione) che vuoi usare. Rilascia per confermare.";
+"Current hotkey" = "Hotkey corrente";
+"Remove custom" = "Rimuovi custom";
+
+/* Output */
+"Copy transcript to clipboard" = "Copia trascritto negli appunti";
+"Paste into active app" = "Incolla nell'app attiva";
+"Start/stop sounds" = "Suoni di start/stop";
+"Auto-paste needs Accessibility. Without it, the transcript stays in the clipboard." = "Auto-paste richiede Accessibility. Senza, il testo resta solo negli appunti.";
+"Permissions" = "Permessi";
+"Accessibility granted" = "Accessibility concessa";
+"Accessibility missing" = "Accessibility mancante";
+"Re-check" = "Ricontrolla";
+"Grant…" = "Concedi…";
+"Startup" = "Avvio";
+"Launch at login" = "Avvia all'accesso al Mac";
+"If recording fails, check System Settings → Login Items." = "Se la registrazione fallisce, controlla System Settings → Login Items.";
+
+/* Advanced */
+"Server" = "Server";
+"Server endpoint" = "Endpoint del server";
+"Model path" = "Path del modello";
+"Restart Whisper server" = "Riavvia il server Whisper";
+"Diagnostics" = "Diagnostica";
+"Push-to-talk log" = "Log push-to-talk";
+"Reveal log in Finder" = "Mostra log in Finder";
+"Recovery" = "Recupero";
+"Last failed audio" = "Ultimo audio fallito";
+"Reveal in Finder" = "Mostra in Finder";
+"No failed audio retained." = "Nessun audio fallito conservato.";
+"When a transcription fails the WAV is kept here so you can recover it. Successful transcriptions are deleted immediately." = "Quando una trascrizione fallisce il WAV viene conservato qui per permetterti di recuperarlo. Le trascrizioni riuscite vengono cancellate subito.";
+
+/* About */
+"Version %@" = "Versione %@";
+"Offline voice transcription on Apple Silicon with Whisper Large V3." = "Trascrizione vocale offline su Apple Silicon con Whisper Large V3.";
+
+/* Downloader */
+"Model" = "Modello";
+"Core ML encoder" = "Encoder Core ML";
+"Extracting Core ML" = "Estrazione Core ML";

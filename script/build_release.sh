@@ -34,6 +34,14 @@ if [[ -f "$ICON_SOURCE" ]]; then
   cp "$ICON_SOURCE" "$APP_RESOURCES/AppIcon.icns"
 fi
 
+LOCALIZED_RESOURCES_SRC="$ROOT_DIR/Resources/Localizations"
+if [[ -d "$LOCALIZED_RESOURCES_SRC" ]]; then
+  for lproj in "$LOCALIZED_RESOURCES_SRC"/*.lproj; do
+    [[ -d "$lproj" ]] || continue
+    cp -R "$lproj" "$APP_RESOURCES/"
+  done
+fi
+
 WHISPER_BIN_DIR="$ROOT_DIR/external/whisper.cpp/build/bin"
 if [[ -x "$WHISPER_BIN_DIR/whisper-cli" && -x "$WHISPER_BIN_DIR/whisper-server" ]]; then
   echo "==> Embedding whisper.cpp binaries"
@@ -76,6 +84,13 @@ cat >"$INFO_PLIST" <<PLIST
   <true/>
   <key>NSMicrophoneUsageDescription</key>
   <string>LocalWhisper records microphone audio and transcribes it locally with Whisper Large V3.</string>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>CFBundleLocalizations</key>
+  <array>
+    <string>en</string>
+    <string>it</string>
+  </array>
 </dict>
 </plist>
 PLIST

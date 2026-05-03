@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 enum TranscriptionStatus: Equatable {
     case idle
@@ -7,18 +8,13 @@ enum TranscriptionStatus: Equatable {
     case completed
     case failed(String)
 
-    var title: String {
+    var title: LocalizedStringKey {
         switch self {
-        case .idle:
-            "Ready"
-        case .recording:
-            "Recording"
-        case .transcribing:
-            "Transcribing"
-        case .completed:
-            "Completed"
-        case .failed:
-            "Error"
+        case .idle: "Ready"
+        case .recording: "Recording"
+        case .transcribing: "Transcribing"
+        case .completed: "Ready"
+        case .failed: "Error"
         }
     }
 
@@ -37,14 +33,11 @@ enum TranscriptionStatus: Equatable {
         }
     }
 
-    var primaryActionTitle: String {
+    var primaryActionTitle: LocalizedStringKey {
         switch self {
-        case .recording:
-            "Stop and Transcribe"
-        case .transcribing:
-            "Transcribing..."
-        default:
-            "Start Recording"
+        case .recording: "Stop and Transcribe"
+        case .transcribing: "Transcribing…"
+        default: "Start Recording"
         }
     }
 

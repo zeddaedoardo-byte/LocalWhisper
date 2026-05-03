@@ -33,6 +33,14 @@ if [[ -f "$ICON_SOURCE" ]]; then
   cp "$ICON_SOURCE" "$APP_RESOURCES/AppIcon.icns"
 fi
 
+LOCALIZED_RESOURCES_SRC="$ROOT_DIR/Resources/Localizations"
+if [[ -d "$LOCALIZED_RESOURCES_SRC" ]]; then
+  for lproj in "$LOCALIZED_RESOURCES_SRC"/*.lproj; do
+    [[ -d "$lproj" ]] || continue
+    cp -R "$lproj" "$APP_RESOURCES/"
+  done
+fi
+
 cat >"$INFO_PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -64,6 +72,13 @@ cat >"$INFO_PLIST" <<PLIST
   <true/>
   <key>NSMicrophoneUsageDescription</key>
   <string>LocalWhisper records microphone audio and transcribes it locally with Whisper Large V3.</string>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>CFBundleLocalizations</key>
+  <array>
+    <string>en</string>
+    <string>it</string>
+  </array>
 </dict>
 </plist>
 PLIST

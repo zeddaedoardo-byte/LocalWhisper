@@ -29,43 +29,43 @@ struct AdvancedSettingsTab: View {
             }
 
             Section {
-                LabeledContent("Log push-to-talk") {
+                LabeledContent("Push-to-talk log") {
                     Text("/tmp/lwf-ptt.log")
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
                         .monospaced()
                 }
-                Button("Mostra log in Finder") {
+                Button("Reveal log in Finder") {
                     NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: "/tmp/lwf-ptt.log")])
                 }
             } header: {
-                Text("Diagnostica")
+                Text("Diagnostics")
             }
 
             Section {
                 if let failed = appState.lastFailedAudioURL {
-                    LabeledContent("Ultimo audio fallito") {
+                    LabeledContent("Last failed audio") {
                         Text(failed.lastPathComponent)
                             .foregroundStyle(.secondary)
                             .textSelection(.enabled)
                     }
                     HStack {
-                        Button("Mostra in Finder") {
+                        Button("Reveal in Finder") {
                             NSWorkspace.shared.activateFileViewerSelecting([failed])
                         }
-                        Button("Elimina") {
+                        Button("Delete") {
                             appState.clearLastFailedAudio()
                         }
                     }
                 } else {
-                    Text("Nessun audio fallito conservato.")
+                    Text("No failed audio retained.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             } header: {
-                Text("Recupero")
+                Text("Recovery")
             } footer: {
-                Text("Quando una trascrizione fallisce il WAV viene conservato qui per permetterti di recuperarlo. Le trascrizioni riuscite vengono cancellate subito.")
+                Text("When a transcription fails the WAV is kept here so you can recover it. Successful transcriptions are deleted immediately.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

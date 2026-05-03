@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import SwiftUI
 
 @MainActor
 final class ModelDownloader: NSObject, ObservableObject {
@@ -9,12 +10,12 @@ final class ModelDownloader: NSObject, ObservableObject {
         case downloadingCoreML
         case extractingCoreML
 
-        var label: String {
+        var label: LocalizedStringKey {
             switch self {
             case .idle: ""
-            case .downloadingModel: "Modello"
-            case .downloadingCoreML: "Encoder Core ML"
-            case .extractingCoreML: "Estrazione Core ML"
+            case .downloadingModel: "Model"
+            case .downloadingCoreML: "Core ML encoder"
+            case .extractingCoreML: "Extracting Core ML"
             }
         }
     }

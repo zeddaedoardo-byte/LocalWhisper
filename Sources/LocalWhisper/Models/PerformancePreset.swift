@@ -9,20 +9,17 @@ enum PerformancePreset: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .quality: "Qualità (più accurato)"
-        case .balanced: "Bilanciato"
-        case .speed: "Velocità (più rapido)"
+        case .quality: String(localized: "Quality (most accurate)")
+        case .balanced: String(localized: "Balanced")
+        case .speed: String(localized: "Speed (fastest)")
         }
     }
 
     var description: String {
         switch self {
-        case .quality:
-            "Beam search ampio, miglior accuratezza. Consigliato su M2/M3/M4 con 16+ GB RAM."
-        case .balanced:
-            "Compromesso tra qualità e tempi di risposta. Default."
-        case .speed:
-            "Beam ridotto + audio context troncato. Ideale su Intel Mac o RAM ridotta."
+        case .quality: String(localized: "Quality preset description")
+        case .balanced: String(localized: "Balanced preset description")
+        case .speed: String(localized: "Speed preset description")
         }
     }
 

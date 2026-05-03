@@ -8,24 +8,24 @@ struct OutputSettingsTab: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Copia trascritto negli appunti", isOn: .constant(true))
+                Toggle("Copy transcript to clipboard", isOn: .constant(true))
                     .disabled(true)
-                Toggle("Incolla nell'app attiva", isOn: $settings.autoPaste)
-                Toggle("Suoni di start/stop", isOn: $settings.playSounds)
+                Toggle("Paste into active app", isOn: $settings.autoPaste)
+                Toggle("Start/stop sounds", isOn: $settings.playSounds)
             } header: {
                 Text("Output")
             } footer: {
-                Text("Auto-paste richiede Accessibility. Senza, il testo resta solo negli appunti.")
+                Text("Auto-paste needs Accessibility. Without it, the transcript stays in the clipboard.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             Section {
-                Toggle("Avvia all'accesso al Mac", isOn: $settings.launchAtLogin)
+                Toggle("Launch at login", isOn: $settings.launchAtLogin)
             } header: {
-                Text("Avvio")
+                Text("Startup")
             } footer: {
-                Text("Se la registrazione fallisce, controlla System Settings → Login Items.")
+                Text("If recording fails, check System Settings → Login Items.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -35,10 +35,10 @@ struct OutputSettingsTab: View {
                     Circle()
                         .fill(appState.hasAccessibility ? Color.green : Color.red)
                         .frame(width: 9, height: 9)
-                    Text(appState.hasAccessibility ? "Accessibility granted" : "Accessibility missing")
+                    accessibilityStatusLabel
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Button(appState.hasAccessibility ? "Re-check" : "Grant...") {
+                    Button(appState.hasAccessibility ? "Re-check" : "Grant…") {
                         appState.requestAccessibilityPermission()
                         openAccessibilitySettings()
                         appState.resetPushToTalk()
@@ -50,6 +50,15 @@ struct OutputSettingsTab: View {
         }
         .formStyle(.grouped)
         .padding(20)
+    }
+
+    @ViewBuilder
+    private var accessibilityStatusLabel: some View {
+        if appState.hasAccessibility {
+            Text("Accessibility granted")
+        } else {
+            Text("Accessibility missing")
+        }
     }
 
     private func openAccessibilitySettings() {

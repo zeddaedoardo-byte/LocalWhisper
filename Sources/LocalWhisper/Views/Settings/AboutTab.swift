@@ -16,10 +16,10 @@ struct AboutTab: View {
             Text("LocalWhisper")
                 .font(.system(size: 22, weight: .semibold))
 
-            Text("Versione \(version)")
+            Text("Version \(version)")
                 .foregroundStyle(.secondary)
 
-            Text("Trascrizione vocale offline su Apple Silicon con Whisper Large V3.")
+            Text("Offline voice transcription on Apple Silicon with Whisper Large V3.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 24)

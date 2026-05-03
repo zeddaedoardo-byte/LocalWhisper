@@ -78,7 +78,7 @@ struct MenuBarView: View {
     private var transcriptSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("Ultima trascrizione")
+                Text("Last transcript")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.secondary)
                     .textCase(.uppercase)
@@ -90,7 +90,7 @@ struct MenuBarView: View {
                         .font(.system(size: 11))
                 }
                 .buttonStyle(.borderless)
-                .help("Copia trascritto")
+                .help("Copy transcript")
             }
             Text(appState.lastTranscript)
                 .font(.system(size: 12))
@@ -118,7 +118,7 @@ struct MenuBarView: View {
             if !appState.hasAccessibility {
                 MenuRow(
                     icon: "lock.open",
-                    label: "Concedi Accessibility...",
+                    label: "Grant Accessibility…",
                     action: {
                         appState.requestAccessibilityPermission()
                         openAccessibilitySettings()
@@ -130,7 +130,7 @@ struct MenuBarView: View {
 
             MenuRow(
                 icon: "gearshape",
-                label: "Settings...",
+                label: "Settings…",
                 action: {
                     openSettings()
                     NSApp.activate(ignoringOtherApps: true)
@@ -139,7 +139,7 @@ struct MenuBarView: View {
 
             MenuRow(
                 icon: "power",
-                label: "Esci",
+                label: "Quit",
                 shortcut: "⌘Q",
                 action: { NSApp.terminate(nil) }
             )
@@ -156,30 +156,30 @@ struct MenuBarView: View {
         }
     }
 
-    private var statusTitle: String {
+    private var statusTitle: LocalizedStringKey {
         switch appState.status {
-        case .idle: "Pronto"
-        case .recording: "Registrazione"
-        case .transcribing: "Trascrizione"
-        case .completed: "Pronto"
-        case .failed: "Errore"
+        case .idle: "Ready"
+        case .recording: "Recording"
+        case .transcribing: "Transcribing"
+        case .completed: "Ready"
+        case .failed: "Error"
         }
     }
 
-    private var triggerHint: String {
+    private var triggerHint: LocalizedStringKey {
         let trigger = PushToTalkTrigger.byID(settings.pushToTalkTriggerID)
-        return "Tieni \(trigger.label) per dettare"
+        return "Hold \(trigger.label) to dictate"
     }
 
-    private var warningMessage: String? {
+    private var warningMessage: LocalizedStringKey? {
         if !appState.hasAccessibility {
-            return "Accessibility non concessa"
+            return "Accessibility not granted"
         }
         if appState.isWarmingUp {
-            return "Caricamento modello..."
+            return "Loading model…"
         }
         if !appState.isServerReady && !appState.isWarmingUp {
-            return "Server fermo"
+            return "Server stopped"
         }
         return nil
     }
@@ -193,7 +193,7 @@ struct MenuBarView: View {
 
 private struct MenuRow: View {
     let icon: String
-    let label: String
+    let label: LocalizedStringKey
     var shortcut: String? = nil
     var disabled: Bool = false
     let action: () -> Void
@@ -233,7 +233,7 @@ private struct MenuRow: View {
 
 private struct MenuToggleRow: View {
     let icon: String
-    let label: String
+    let label: LocalizedStringKey
     @Binding var isOn: Bool
 
     @State private var hovered = false
