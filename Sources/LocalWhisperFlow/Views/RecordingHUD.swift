@@ -14,13 +14,26 @@ enum RecordingHUDState: Equatable {
 @MainActor
 final class RecordingHUDViewModel: ObservableObject {
     @Published var state: RecordingHUDState = .hidden
-    @Published var levelDB: Float = -160
     @Published var hint: String = ""
+    @Published private(set) var levelHistory: [Float]
+
+    var levelDB: Float = -160 {
+        didSet { pushLevel(levelDB) }
+    }
+
+    init(historySize: Int = 11) {
+        self.levelHistory = Array(repeating: -160, count: historySize)
+    }
+
+    private func pushLevel(_ db: Float) {
+        levelHistory.removeFirst()
+        levelHistory.append(db)
+    }
 }
 
-private let kHUDBarCount = 5
-private let kHUDWidth: CGFloat = 200
-private let kHUDHeight: CGFloat = 48
+private let kHUDBarCount = 11
+private let kHUDWidth: CGFloat = 220
+private let kHUDHeight: CGFloat = 54
 
 struct RecordingHUDView: View {
     @ObservedObject var viewModel: RecordingHUDViewModel
@@ -29,25 +42,28 @@ struct RecordingHUDView: View {
         ZStack {
             HUDVisualEffect(material: .hudWindow)
 
-            HStack(spacing: 9) {
+            HStack(spacing: 10) {
                 indicator
                     .frame(width: 16, height: 16)
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
+                WaveformView(
+                    state: viewModel.state,
+                    levels: viewModel.levelHistory
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                    EqualizerView(state: viewModel.state, levelDB: viewModel.levelDB)
-                        .frame(height: 11)
-                }
-                Spacer(minLength: 0)
+                Text(title)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .frame(width: 76, alignment: .trailing)
             }
-            .padding(.horizontal, 11)
+            .padding(.horizontal, 12)
             .padding(.vertical, 8)
         }
         .frame(width: kHUDWidth, height: kHUDHeight)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .black.opacity(0.25), radius: 12, y: 6)
     }
 
     private var title: String {
@@ -98,61 +114,71 @@ struct RecordingHUDView: View {
     }
 }
 
-private struct EqualizerView: View {
+private struct WaveformView: View {
     let state: RecordingHUDState
-    let levelDB: Float
+    let levels: [Float]
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { context in
-            let phase = context.date.timeIntervalSinceReferenceDate
-            HStack(spacing: 4) {
-                ForEach(0..<kHUDBarCount, id: \.self) { index in
-                    bar(for: index, phase: phase)
-                }
-            }
-        }
-    }
-
-    private func bar(for index: Int, phase: TimeInterval) -> some View {
         GeometryReader { geo in
             let height = geo.size.height
-            let amplitude = barAmplitude(index: index, phase: phase)
-            let h = max(2, CGFloat(amplitude) * height)
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(barColor)
-                .frame(height: h)
-                .frame(maxHeight: .infinity, alignment: .center)
+            let width = geo.size.width
+            let count = max(levels.count, 1)
+            let spacing: CGFloat = 3
+            let barWidth = max(1, (width - spacing * CGFloat(count - 1)) / CGFloat(count))
+
+            HStack(spacing: spacing) {
+                ForEach(0..<count, id: \.self) { i in
+                    Capsule(style: .continuous)
+                        .fill(barFill(for: i))
+                        .frame(width: barWidth, height: max(barWidth, barHeight(for: i, fullHeight: height)))
+                        .animation(.easeOut(duration: 0.08), value: levels[i])
+                }
+            }
+            .frame(width: width, height: height, alignment: .center)
         }
     }
 
-    private func barAmplitude(index: Int, phase: TimeInterval) -> Double {
+    private func barHeight(for index: Int, fullHeight: CGFloat) -> CGFloat {
         switch state {
         case .recording:
-            let normalized = max(0, min(1, Double((levelDB + 50) / 50)))
-            let envelope = 0.4 + 0.6 * normalized
-            let wave = sin(phase * 6 + Double(index) * 0.7)
-            let jitter = 0.5 + 0.5 * wave
-            return envelope * (0.35 + 0.65 * jitter)
+            let normalized = normalize(levels[index])
+            return CGFloat(0.18 + 0.82 * normalized) * fullHeight
         case .transcribing, .warmingUp:
-            let wave = sin(phase * 4 + Double(index) * 0.9)
-            return 0.35 + 0.35 * (0.5 + 0.5 * wave)
-        case .completed:
-            return 0.25
-        case .error:
-            return 0.20
+            return shimmerHeight(index: index, fullHeight: fullHeight)
+        case .completed, .error:
+            return fullHeight * 0.22
         case .ready, .hidden:
-            return 0.12
+            return fullHeight * 0.14
         }
     }
 
-    private var barColor: Color {
+    private func shimmerHeight(index: Int, fullHeight: CGFloat) -> CGFloat {
+        let phase = Date().timeIntervalSinceReferenceDate
+        let wave = sin(phase * 4 + Double(index) * 0.6)
+        let scaled = 0.45 + 0.35 * (0.5 + 0.5 * wave)
+        return CGFloat(scaled) * fullHeight
+    }
+
+    private func normalize(_ db: Float) -> Double {
+        let clamped = max(-60, min(0, db))
+        return Double((clamped + 60) / 60)
+    }
+
+    private func barFill(for index: Int) -> LinearGradient {
+        let colors: [Color]
         switch state {
-        case .recording: .red
-        case .transcribing, .warmingUp: .blue
-        case .completed: .green
-        case .error: .orange
-        case .ready, .hidden: .secondary
+        case .recording:
+            colors = [Color.red.opacity(0.95), Color.pink.opacity(0.85)]
+        case .transcribing, .warmingUp:
+            colors = [Color.blue.opacity(0.9), Color.cyan.opacity(0.85)]
+        case .completed:
+            colors = [Color.green.opacity(0.9), Color.mint.opacity(0.85)]
+        case .error:
+            colors = [Color.orange.opacity(0.9), Color.yellow.opacity(0.85)]
+        case .ready, .hidden:
+            colors = [Color.secondary.opacity(0.45), Color.secondary.opacity(0.35)]
         }
+        return LinearGradient(colors: colors, startPoint: .top, endPoint: .bottom)
     }
 }
 

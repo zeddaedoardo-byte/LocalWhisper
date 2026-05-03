@@ -28,6 +28,7 @@ struct WhisperSettingsTab: View {
     @StateObject private var downloader = ModelDownloader()
 
     @State private var downloadError: String?
+    @State private var modelPendingDeletion: WhisperModelInfo?
 
     var body: some View {
         Form {
@@ -91,6 +92,13 @@ struct WhisperSettingsTab: View {
                             } else if isModelInstalled(model) {
                                 Button("Usa") { useModel(model) }
                                     .controlSize(.small)
+                                Button {
+                                    modelPendingDeletion = model
+                                } label: {
+                                    Image(systemName: "trash")
+                                }
+                                .buttonStyle(.borderless)
+                                .help("Elimina dal disco")
                             } else if downloader.inFlightModelID == model.id {
                                 VStack(alignment: .trailing, spacing: 2) {
                                     ProgressView(value: downloader.progress).frame(width: 110)
@@ -191,6 +199,16 @@ struct WhisperSettingsTab: View {
         }
         .formStyle(.grouped)
         .padding(20)
+        .alert(item: $modelPendingDeletion) { model in
+            Alert(
+                title: Text("Eliminare \(model.label)?"),
+                message: Text("Verranno cancellati il file modello e l'eventuale Core ML encoder, liberando ~\(spaceUsed(by: model)) MB. Puoi sempre riscaricarlo."),
+                primaryButton: .destructive(Text("Elimina")) {
+                    deleteModel(model)
+                },
+                secondaryButton: .cancel(Text("Annulla"))
+            )
+        }
     }
 
     // MARK: - Helpers
@@ -257,6 +275,44 @@ struct WhisperSettingsTab: View {
             .appendingPathComponent(model.filename).path
         if FileManager.default.fileExists(atPath: path) {
             settings.modelPath = path
+        }
+    }
+
+    private func spaceUsed(by model: WhisperModelInfo) -> Int {
+        var total: Int64 = 0
+        let modelURL = ProjectPaths.applicationSupportModelsDir
+            .appendingPathComponent(model.filename)
+        if let size = try? FileManager.default
+            .attributesOfItem(atPath: modelURL.path)[.size] as? Int64 {
+            total += size
+        }
+        let encoderURL = coreMLDirURL(for: model)
+        if let enumerator = FileManager.default.enumerator(at: encoderURL,
+                                                            includingPropertiesForKeys: [.fileSizeKey],
+                                                            options: [.skipsHiddenFiles]) {
+            for case let url as URL in enumerator {
+                if let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize {
+                    total += Int64(size)
+                }
+            }
+        }
+        return Int(total / (1024 * 1024))
+    }
+
+    private func deleteModel(_ model: WhisperModelInfo) {
+        let fm = FileManager.default
+        let modelURL = ProjectPaths.applicationSupportModelsDir
+            .appendingPathComponent(model.filename)
+        let encoderURL = coreMLDirURL(for: model)
+
+        try? fm.removeItem(at: modelURL)
+        try? fm.removeItem(at: encoderURL)
+
+        // Cleanup MACOSX metadata folder that unzip may produce.
+        let macosxDir = ProjectPaths.applicationSupportModelsDir
+            .appendingPathComponent("__MACOSX")
+        if fm.fileExists(atPath: macosxDir.path) {
+            try? fm.removeItem(at: macosxDir)
         }
     }
 
