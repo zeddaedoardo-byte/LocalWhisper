@@ -89,9 +89,15 @@ enum AudioDeviceCatalog {
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
-        var value: CFString? = nil
-        let status = AudioObjectGetPropertyData(id, &address, 0, nil, &size, &value)
-        guard status == noErr else { return nil }
-        return value as String?
+        let valuePointer = UnsafeMutablePointer<CFString?>.allocate(capacity: 1)
+        valuePointer.initialize(to: nil)
+        defer {
+            valuePointer.deinitialize(count: 1)
+            valuePointer.deallocate()
+        }
+
+        let status = AudioObjectGetPropertyData(id, &address, 0, nil, &size, valuePointer)
+        guard status == noErr, let value = valuePointer.pointee else { return nil }
+        return value as String
     }
 }

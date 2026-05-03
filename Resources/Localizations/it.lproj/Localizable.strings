@@ -72,6 +72,10 @@
 "whisper-cli binary" = "Binario whisper-cli";
 "Active model path" = "Path del modello attivo";
 "Restore defaults" = "Ripristina default";
+"Choose..." = "Scegli...";
+"Choose %@" = "Scegli %@";
+"Download failed: %@" = "Download fallito: %@";
+"Core ML download failed: %@" = "Download Core ML fallito: %@";
 
 /* Microphone */
 "Input device" = "Dispositivo di input";
@@ -97,6 +101,7 @@
 "Press and hold the key (or combo) you want. Release to confirm." = "Premi e tieni il tasto (o la combinazione) che vuoi usare. Rilascia per confermare.";
 "Current hotkey" = "Hotkey corrente";
 "Remove custom" = "Rimuovi custom";
+"Custom" = "Custom";
 
 /* Output */
 "Copy transcript to clipboard" = "Copia trascritto negli appunti";
@@ -134,3 +139,5 @@
 "Model" = "Modello";
 "Core ML encoder" = "Encoder Core ML";
 "Extracting Core ML" = "Estrazione Core ML";
+"Core ML extraction failed (exit %d)" = "Estrazione Core ML fallita (exit %d)";
+"Copied to clipboard. Paste failed: %@" = "Copiato negli appunti. Paste fallito: %@";

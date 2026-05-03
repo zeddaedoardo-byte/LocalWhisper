@@ -143,7 +143,12 @@ final class ModelDownloader: NSObject, ObservableObject {
                         throwing: NSError(
                             domain: "ModelDownloader",
                             code: 100,
-                            userInfo: [NSLocalizedDescriptionKey: "Estrazione Core ML fallita (exit \(proc.terminationStatus))"]
+                            userInfo: [
+                                NSLocalizedDescriptionKey: L10n.format(
+                                    "Core ML extraction failed (exit %d)",
+                                    proc.terminationStatus
+                                )
+                            ]
                         )
                     )
                     return

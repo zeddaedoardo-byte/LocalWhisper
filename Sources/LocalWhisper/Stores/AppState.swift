@@ -426,7 +426,10 @@ final class AppState: ObservableObject {
                     try await Task.sleep(nanoseconds: 150_000_000)
                     try pasteService.paste()
                 } catch {
-                    pasteWarning = "Copiato negli appunti. Paste fallito: \(error.localizedDescription)"
+                    pasteWarning = L10n.format(
+                        "Copied to clipboard. Paste failed: %@",
+                        error.localizedDescription
+                    )
                     lastError = pasteWarning
                 }
             }

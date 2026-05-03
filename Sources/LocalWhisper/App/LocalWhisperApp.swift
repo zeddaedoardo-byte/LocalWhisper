@@ -18,6 +18,7 @@ struct LocalWhisperApp: App {
             MenuBarView()
                 .environmentObject(settings)
                 .environmentObject(appState)
+                .environment(\.locale, L10n.locale)
         } label: {
             Image(nsImage: MenuBarIconRenderer.shared.image)
         }
@@ -27,6 +28,7 @@ struct LocalWhisperApp: App {
             SettingsView()
                 .environmentObject(settings)
                 .environmentObject(appState)
+                .environment(\.locale, L10n.locale)
         }
     }
 }

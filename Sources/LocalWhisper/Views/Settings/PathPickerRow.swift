@@ -8,7 +8,7 @@ struct PathPickerRow: View {
 
     var body: some View {
         HStack {
-            TextField(title, text: $path)
+            TextField(LocalizedStringKey(title), text: $path)
                 .textFieldStyle(.roundedBorder)
 
             Button("Choose...") {
@@ -19,7 +19,7 @@ struct PathPickerRow: View {
 
     private func choosePath() {
         let panel = NSOpenPanel()
-        panel.title = "Choose \(title)"
+        panel.title = L10n.format("Choose %@", L10n.string(title))
         panel.canChooseFiles = !canChooseDirectories
         panel.canChooseDirectories = canChooseDirectories
         panel.allowsMultipleSelection = false

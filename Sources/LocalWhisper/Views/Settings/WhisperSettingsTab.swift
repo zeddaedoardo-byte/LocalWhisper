@@ -230,8 +230,7 @@ struct WhisperSettingsTab: View {
     }
 
     private func deletionMessage(for model: WhisperModelInfo) -> String {
-        let format = String(localized: "Delete %@ confirmation")
-        return String(format: format, "\(spaceUsed(by: model))")
+        L10n.format("Delete %@ confirmation", Int64(spaceUsed(by: model)))
     }
 
     // MARK: - Helpers
@@ -350,7 +349,7 @@ struct WhisperSettingsTab: View {
             )
             settings.modelPath = url.path
         } catch {
-            downloadError = "Download fallito: \(error.localizedDescription)"
+            downloadError = L10n.format("Download failed: %@", error.localizedDescription)
         }
     }
 
@@ -366,7 +365,7 @@ struct WhisperSettingsTab: View {
             )
             settings.modelPath = url.path
         } catch {
-            downloadError = "Download Core ML fallito: \(error.localizedDescription)"
+            downloadError = L10n.format("Core ML download failed: %@", error.localizedDescription)
         }
     }
 

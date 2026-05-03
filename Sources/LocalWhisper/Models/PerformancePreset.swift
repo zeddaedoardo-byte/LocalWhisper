@@ -9,17 +9,17 @@ enum PerformancePreset: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .quality: String(localized: "Quality (most accurate)")
-        case .balanced: String(localized: "Balanced")
-        case .speed: String(localized: "Speed (fastest)")
+        case .quality: L10n.string("Quality (most accurate)")
+        case .balanced: L10n.string("Balanced")
+        case .speed: L10n.string("Speed (fastest)")
         }
     }
 
     var description: String {
         switch self {
-        case .quality: String(localized: "Quality preset description")
-        case .balanced: String(localized: "Balanced preset description")
-        case .speed: String(localized: "Speed preset description")
+        case .quality: L10n.string("Quality preset description")
+        case .balanced: L10n.string("Balanced preset description")
+        case .speed: L10n.string("Speed preset description")
         }
     }
 
