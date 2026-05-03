@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 @main
@@ -18,7 +19,7 @@ struct LocalWhisperFlowApp: App {
                 .environmentObject(settings)
                 .environmentObject(appState)
         } label: {
-            MenuBarIcon(appState: appState)
+            Image(nsImage: MenuBarIconRenderer.shared.image)
         }
         .menuBarExtraStyle(.window)
 
@@ -30,38 +31,32 @@ struct LocalWhisperFlowApp: App {
     }
 }
 
-private struct MenuBarIcon: View {
-    @ObservedObject var appState: AppState
+private final class MenuBarIconRenderer {
+    static let shared = MenuBarIconRenderer()
 
-    var body: some View {
-        if #available(macOS 14, *) {
-            Image(systemName: symbol)
-                .symbolRenderingMode(.monochrome)
-                .symbolEffect(.variableColor.iterative.reversing,
-                              isActive: shouldAnimate)
-        } else {
-            Image(systemName: symbol)
-        }
-    }
+    let image: NSImage
 
-    private var symbol: String {
-        switch appState.status {
-        case .recording: "record.circle.fill"
-        case .transcribing: "waveform"
-        case .completed: "checkmark.circle.fill"
-        case .failed: "exclamationmark.triangle.fill"
-        case .idle:
-            if appState.isWarmingUp { "mic.badge.ellipsis" }
-            else if appState.isServerReady { "mic.fill" }
-            else { "mic" }
+    private init() {
+        let size = NSSize(width: 18, height: 18)
+        let img = NSImage(size: size, flipped: false) { rect in
+            let bars: [(x: CGFloat, h: CGFloat)] = [
+                (3.5, 7),
+                (8.0, 15),
+                (12.5, 10)
+            ]
+            NSColor.black.setFill()
+            for bar in bars {
+                let barRect = NSRect(
+                    x: bar.x - 1.25,
+                    y: (size.height - bar.h) / 2,
+                    width: 2.5,
+                    height: bar.h
+                )
+                NSBezierPath(roundedRect: barRect, xRadius: 1.25, yRadius: 1.25).fill()
+            }
+            return true
         }
-    }
-
-    private var shouldAnimate: Bool {
-        switch appState.status {
-        case .recording, .transcribing: true
-        case .idle: appState.isWarmingUp
-        default: false
-        }
+        img.isTemplate = true
+        self.image = img
     }
 }

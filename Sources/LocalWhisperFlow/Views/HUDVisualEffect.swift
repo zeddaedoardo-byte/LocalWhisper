@@ -4,11 +4,14 @@ import SwiftUI
 struct HUDVisualEffect: NSViewRepresentable {
     let material: NSVisualEffectView.Material
     let blendingMode: NSVisualEffectView.BlendingMode
+    var cornerRadius: CGFloat = 14
 
     init(material: NSVisualEffectView.Material = .hudWindow,
-         blendingMode: NSVisualEffectView.BlendingMode = .behindWindow) {
+         blendingMode: NSVisualEffectView.BlendingMode = .behindWindow,
+         cornerRadius: CGFloat = 14) {
         self.material = material
         self.blendingMode = blendingMode
+        self.cornerRadius = cornerRadius
     }
 
     func makeNSView(context: Context) -> NSVisualEffectView {
@@ -17,7 +20,7 @@ struct HUDVisualEffect: NSViewRepresentable {
         view.blendingMode = blendingMode
         view.state = .active
         view.wantsLayer = true
-        view.layer?.cornerRadius = 16
+        view.layer?.cornerRadius = cornerRadius
         view.layer?.cornerCurve = .continuous
         view.layer?.masksToBounds = true
         return view

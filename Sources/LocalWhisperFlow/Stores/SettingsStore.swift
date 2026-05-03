@@ -13,6 +13,8 @@ final class SettingsStore: ObservableObject {
         static let customTriggerLabel = "customTriggerLabel"
         static let performancePreset = "performancePreset"
         static let didSuggestPreset = "didSuggestPreset"
+        static let launchAtLogin = "launchAtLogin"
+        static let playSounds = "playSounds"
     }
 
     private let defaults: UserDefaults
@@ -68,6 +70,14 @@ final class SettingsStore: ObservableObject {
         set { performancePresetID = newValue.rawValue }
     }
 
+    @Published var launchAtLogin: Bool {
+        didSet { defaults.set(launchAtLogin, forKey: Keys.launchAtLogin) }
+    }
+
+    @Published var playSounds: Bool {
+        didSet { defaults.set(playSounds, forKey: Keys.playSounds) }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
@@ -104,6 +114,9 @@ final class SettingsStore: ObservableObject {
         self.customTriggerKeycode = defaults.object(forKey: Keys.customTriggerKeycode) as? Int ?? -1
         self.customTriggerFlags = (defaults.string(forKey: Keys.customTriggerFlags).flatMap(UInt64.init)) ?? 0
         self.customTriggerLabel = defaults.string(forKey: Keys.customTriggerLabel) ?? ""
+
+        self.launchAtLogin = defaults.object(forKey: Keys.launchAtLogin) as? Bool ?? false
+        self.playSounds = defaults.object(forKey: Keys.playSounds) as? Bool ?? true
 
         let didSuggest = defaults.bool(forKey: Keys.didSuggestPreset)
         let storedPreset = defaults.string(forKey: Keys.performancePreset)

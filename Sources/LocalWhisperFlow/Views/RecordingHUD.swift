@@ -32,85 +32,24 @@ final class RecordingHUDViewModel: ObservableObject {
 }
 
 private let kHUDBarCount = 11
-private let kHUDWidth: CGFloat = 220
-private let kHUDHeight: CGFloat = 54
+private let kHUDWidth: CGFloat = 140
+private let kHUDHeight: CGFloat = 44
 
 struct RecordingHUDView: View {
     @ObservedObject var viewModel: RecordingHUDViewModel
 
     var body: some View {
         ZStack {
-            HUDVisualEffect(material: .hudWindow)
+            HUDVisualEffect(material: .hudWindow, cornerRadius: 14)
 
-            HStack(spacing: 10) {
-                indicator
-                    .frame(width: 16, height: 16)
-
-                WaveformView(
-                    state: viewModel.state,
-                    levels: viewModel.levelHistory
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                Text(title)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .frame(width: 76, alignment: .trailing)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            WaveformView(
+                state: viewModel.state,
+                levels: viewModel.levelHistory
+            )
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
         }
         .frame(width: kHUDWidth, height: kHUDHeight)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: .black.opacity(0.25), radius: 12, y: 6)
-    }
-
-    private var title: String {
-        switch viewModel.state {
-        case .hidden: ""
-        case .warmingUp: "Caricamento..."
-        case .ready: "Pronto"
-        case .recording: "Registrazione"
-        case .transcribing: "Trascrizione"
-        case .completed(let preview): preview.isEmpty ? "Fatto" : preview
-        case .error(let message): message.isEmpty ? "Errore" : message
-        }
-    }
-
-
-    @ViewBuilder
-    private var indicator: some View {
-        switch viewModel.state {
-        case .recording:
-            TimelineView(.animation) { context in
-                let pulse = 0.5 + 0.5 * sin(context.date.timeIntervalSince1970 * 5)
-                Circle()
-                    .fill(Color.red)
-                    .opacity(0.55 + 0.45 * pulse)
-                    .overlay(
-                        Circle().stroke(Color.red.opacity(0.35), lineWidth: 3)
-                            .scaleEffect(1 + CGFloat(pulse) * 0.18)
-                    )
-            }
-        case .transcribing, .warmingUp:
-            ProgressView()
-                .progressViewStyle(.circular)
-                .controlSize(.small)
-        case .completed:
-            Image(systemName: "checkmark.circle.fill")
-                .resizable()
-                .foregroundStyle(.green)
-        case .error:
-            Image(systemName: "exclamationmark.triangle.fill")
-                .resizable()
-                .foregroundStyle(.orange)
-        case .ready, .hidden:
-            Image(systemName: "mic.fill")
-                .resizable()
-                .scaledToFit()
-                .foregroundStyle(.secondary)
-        }
     }
 }
 
@@ -270,6 +209,9 @@ final class RecordingHUDController {
         panel.ignoresMouseEvents = true
         panel.isMovable = false
         panel.contentView = host
+        host.wantsLayer = true
+        host.layer?.backgroundColor = NSColor.clear.cgColor
+        panel.invalidateShadow()
         positionPanel(panel)
         self.panel = panel
     }

@@ -8,13 +8,24 @@ struct OutputSettingsTab: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Copy transcript to clipboard", isOn: .constant(true))
+                Toggle("Copia trascritto negli appunti", isOn: .constant(true))
                     .disabled(true)
-                Toggle("Paste into active app", isOn: $settings.autoPaste)
+                Toggle("Incolla nell'app attiva", isOn: $settings.autoPaste)
+                Toggle("Suoni di start/stop", isOn: $settings.playSounds)
             } header: {
                 Text("Output")
             } footer: {
-                Text("Auto-paste needs Accessibility. Without it, the transcript still lands in the clipboard.")
+                Text("Auto-paste richiede Accessibility. Senza, il testo resta solo negli appunti.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Toggle("Avvia all'accesso al Mac", isOn: $settings.launchAtLogin)
+            } header: {
+                Text("Avvio")
+            } footer: {
+                Text("Se la registrazione fallisce, controlla System Settings → Login Items.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

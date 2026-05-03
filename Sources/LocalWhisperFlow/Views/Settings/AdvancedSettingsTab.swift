@@ -29,17 +29,45 @@ struct AdvancedSettingsTab: View {
             }
 
             Section {
-                LabeledContent("Push-to-talk diagnostic log") {
+                LabeledContent("Log push-to-talk") {
                     Text("/tmp/lwf-ptt.log")
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
                         .monospaced()
                 }
-                Button("Reveal log in Finder") {
+                Button("Mostra log in Finder") {
                     NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: "/tmp/lwf-ptt.log")])
                 }
             } header: {
-                Text("Diagnostics")
+                Text("Diagnostica")
+            }
+
+            Section {
+                if let failed = appState.lastFailedAudioURL {
+                    LabeledContent("Ultimo audio fallito") {
+                        Text(failed.lastPathComponent)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
+                    HStack {
+                        Button("Mostra in Finder") {
+                            NSWorkspace.shared.activateFileViewerSelecting([failed])
+                        }
+                        Button("Elimina") {
+                            appState.clearLastFailedAudio()
+                        }
+                    }
+                } else {
+                    Text("Nessun audio fallito conservato.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Recupero")
+            } footer: {
+                Text("Quando una trascrizione fallisce il WAV viene conservato qui per permetterti di recuperarlo. Le trascrizioni riuscite vengono cancellate subito.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

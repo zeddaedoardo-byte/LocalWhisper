@@ -9,6 +9,7 @@ final class AppState: ObservableObject {
     @Published private(set) var isWarmingUp = false
     @Published private(set) var isServerReady = false
     @Published private(set) var hasAccessibility = false
+    @Published private(set) var lastFailedAudioURL: URL?
 
     let hudController = RecordingHUDController()
 
@@ -26,17 +27,23 @@ final class AppState: ObservableObject {
     private var triggerSettingCancellable: AnyCancellable?
     private var presetSettingCancellable: AnyCancellable?
     private var modelSettingCancellable: AnyCancellable?
+    private var soundSettingCancellable: AnyCancellable?
+    private var launchSettingCancellable: AnyCancellable?
     private var accessibilityPollTimer: Timer?
 
     init(settings: SettingsStore) {
         self.settings = settings
         audioRecorder.preferredDeviceUID = settings.preferredMicUID.isEmpty ? nil : settings.preferredMicUID
         PushToTalkService.setTrigger(AppState.resolveTrigger(settings))
+        SoundService.shared.isEnabled = settings.playSounds
+        applyLaunchAtLoginSetting()
         observeAudioLevel()
         observeMicSetting()
         observeTriggerSetting()
         observePresetSetting()
         observeModelSetting()
+        observeSoundSetting()
+        observeLaunchSetting()
         refreshAccessibilityStatus()
         startPushToTalk()
         scheduleWarmup()
@@ -166,6 +173,31 @@ final class AppState: ObservableObject {
         clipboardService.copy(lastTranscript)
     }
 
+    func clearLastFailedAudio() {
+        if let url = lastFailedAudioURL {
+            try? FileManager.default.removeItem(at: url)
+        }
+        lastFailedAudioURL = nil
+    }
+
+    private func keepAsLastFailedAudio(_ source: URL) {
+        let fm = FileManager.default
+        let dir = ProjectPaths.applicationSupportRoot
+        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        let destination = dir.appendingPathComponent("last-failed.wav")
+        if fm.fileExists(atPath: destination.path) {
+            try? fm.removeItem(at: destination)
+        }
+        do {
+            try fm.moveItem(at: source, to: destination)
+            lastFailedAudioURL = destination
+        } catch {
+            // Fall back to deleting if we can't move.
+            try? fm.removeItem(at: source)
+            lastFailedAudioURL = nil
+        }
+    }
+
     func runMicLevelTest(seconds: TimeInterval = 1.5) async -> Float {
         do {
             return try await audioRecorder.quickLevelTest(seconds: seconds)
@@ -206,6 +238,32 @@ final class AppState: ObservableObject {
             .sink { [weak self] _ in
                 self?.scheduleWarmup()
             }
+    }
+
+    private func observeSoundSetting() {
+        soundSettingCancellable = settings.$playSounds
+            .receive(on: RunLoop.main)
+            .sink { enabled in
+                SoundService.shared.isEnabled = enabled
+            }
+    }
+
+    private func observeLaunchSetting() {
+        launchSettingCancellable = settings.$launchAtLogin
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.applyLaunchAtLoginSetting()
+            }
+    }
+
+    private func applyLaunchAtLoginSetting() {
+        let desired = settings.launchAtLogin
+        let actual = LoginItemService.shared.setEnabled(desired)
+        if !actual, desired {
+            // Failed to register: reflect actual state back to settings to keep UI honest.
+            settings.launchAtLogin = false
+        }
     }
 
     private func observeTriggerSetting() {
@@ -262,6 +320,7 @@ final class AppState: ObservableObject {
             lastError = nil
             lastTranscript = ""
             _ = try await audioRecorder.startRecording()
+            SoundService.shared.playStartListening()
             status = .recording
             hudController.update(state: .recording)
         } catch {
@@ -270,8 +329,21 @@ final class AppState: ObservableObject {
     }
 
     private func stopAndTranscribe() async {
+        var pendingAudioURL: URL?
+        var transcribeSucceeded = false
+        defer {
+            if let url = pendingAudioURL {
+                if transcribeSucceeded {
+                    try? FileManager.default.removeItem(at: url)
+                } else {
+                    keepAsLastFailedAudio(url)
+                }
+            }
+        }
         do {
             let audioURL = try audioRecorder.stopRecording()
+            pendingAudioURL = audioURL
+            SoundService.shared.playStopListening()
             status = .transcribing
             hudController.update(state: .transcribing)
 
@@ -282,6 +354,7 @@ final class AppState: ObservableObject {
                 language: settings.language,
                 params: currentDecodingParams
             )
+            transcribeSucceeded = true
 
             lastTranscript = transcript
             clipboardService.copy(transcript)
