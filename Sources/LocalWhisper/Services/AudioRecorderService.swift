@@ -108,6 +108,12 @@ final class AudioRecorderService: NSObject, ObservableObject {
         }
     }
 
+    func restart() async {
+        guard !isRecording else { return }
+        tearDownEngine()
+        await prewarm()
+    }
+
     func startRecording() async throws -> URL {
         if !isPrepared {
             try await prepareEngine()

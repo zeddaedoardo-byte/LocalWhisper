@@ -229,6 +229,23 @@ final class AppState: ObservableObject {
         clipboardService.copy(lastTranscript)
     }
 
+    /// Tears the audio engine and whisper-server down and brings them back
+    /// up. Used as a manual "Restart" recovery from the menu when the
+    /// auto-recovery on sleep/wake or device change failed to catch a stuck
+    /// state.
+    func restartPipeline() {
+        guard status != .recording, status != .transcribing else { return }
+        let recorder = audioRecorder
+        let service = whisperService
+        Task { [weak self] in
+            await recorder.restart()
+            await service.shutdown()
+            await MainActor.run {
+                self?.scheduleWarmup()
+            }
+        }
+    }
+
     func clearLastFailedAudio() {
         if let url = lastFailedAudioURL {
             try? FileManager.default.removeItem(at: url)

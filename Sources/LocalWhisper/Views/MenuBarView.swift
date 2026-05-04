@@ -126,6 +126,12 @@ struct MenuBarView: View {
                 )
             }
 
+            MenuRow(
+                icon: "arrow.clockwise",
+                label: "Restart engine",
+                action: { appState.restartPipeline() }
+            )
+
             Divider().padding(.vertical, 4)
 
             MenuRow(
