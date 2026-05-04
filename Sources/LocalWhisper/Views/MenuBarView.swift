@@ -34,6 +34,12 @@ struct MenuBarView: View {
                     .padding(.vertical, 10)
             }
 
+            if let label = timeSavedLabel {
+                timeSavedBanner(label)
+                    .padding(.horizontal, 10)
+                    .padding(.bottom, 8)
+            }
+
             if let error = appState.lastError {
                 Divider()
                 Text(error)
@@ -98,6 +104,48 @@ struct MenuBarView: View {
                 .lineLimit(4)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    private func timeSavedBanner(_ label: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "bolt.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.green)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(label)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.green)
+                Text("saved vs typing")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.green.opacity(0.75))
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.green.opacity(0.12))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color.green.opacity(0.25), lineWidth: 1)
+        )
+    }
+
+    private var timeSavedLabel: String? {
+        let total = settings.totalTimeSavedSeconds
+        guard total >= 1 else { return nil }
+        if total < 60 {
+            return "\(Int(total)) sec"
+        }
+        let minutes = Int(total / 60)
+        if minutes < 60 {
+            return "\(minutes) min"
+        }
+        let h = minutes / 60
+        let m = minutes % 60
+        return m > 0 ? "\(h) h \(m) min" : "\(h) h"
     }
 
     private var actions: some View {

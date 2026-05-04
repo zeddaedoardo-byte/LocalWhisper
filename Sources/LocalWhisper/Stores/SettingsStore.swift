@@ -16,6 +16,7 @@ final class SettingsStore: ObservableObject {
         static let launchAtLogin = "launchAtLogin"
         static let playSounds = "playSounds"
         static let hasCompletedOnboarding = "hasCompletedOnboarding"
+        static let totalTimeSavedSeconds = "totalTimeSavedSeconds"
     }
 
     private let defaults: UserDefaults
@@ -83,6 +84,10 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(hasCompletedOnboarding, forKey: Keys.hasCompletedOnboarding) }
     }
 
+    @Published var totalTimeSavedSeconds: Double {
+        didSet { defaults.set(totalTimeSavedSeconds, forKey: Keys.totalTimeSavedSeconds) }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
@@ -123,6 +128,7 @@ final class SettingsStore: ObservableObject {
         self.launchAtLogin = defaults.object(forKey: Keys.launchAtLogin) as? Bool ?? false
         self.playSounds = defaults.object(forKey: Keys.playSounds) as? Bool ?? true
         self.hasCompletedOnboarding = defaults.bool(forKey: Keys.hasCompletedOnboarding)
+        self.totalTimeSavedSeconds = defaults.double(forKey: Keys.totalTimeSavedSeconds)
 
         let didSuggest = defaults.bool(forKey: Keys.didSuggestPreset)
         let storedPreset = defaults.string(forKey: Keys.performancePreset)

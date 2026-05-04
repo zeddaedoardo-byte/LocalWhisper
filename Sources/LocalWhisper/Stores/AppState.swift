@@ -1,3 +1,4 @@
+import AVFoundation
 import Combine
 import Foundation
 
@@ -456,6 +457,7 @@ final class AppState: ObservableObject {
 
             lastTranscript = transcript
             clipboardService.copy(transcript)
+            accumulateTimeSaved(transcript: transcript, audioURL: audioURL)
 
             var pasteWarning: String?
             if settings.autoPaste {
@@ -495,5 +497,17 @@ final class AppState: ObservableObject {
         lastError = message
         status = .failed(message)
         hudController.update(state: .error(message))
+    }
+
+    private func accumulateTimeSaved(transcript: String, audioURL: URL) {
+        let wordCount = transcript.split(separator: " ").count
+        guard wordCount > 0 else { return }
+        var audioDurationSeconds: Double = 0
+        if let audioFile = try? AVAudioFile(forReading: audioURL) {
+            audioDurationSeconds = Double(audioFile.length) / audioFile.processingFormat.sampleRate
+        }
+        let typingBaseline = 40.0  // WPM, general population average
+        let savedSeconds = max(0, Double(wordCount) / typingBaseline * 60.0 - audioDurationSeconds)
+        settings.totalTimeSavedSeconds += savedSeconds
     }
 }
