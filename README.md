@@ -71,6 +71,31 @@ git pull
 ./install.sh
 ```
 
+## Distributing a notarized DMG (developers with Apple Developer Program)
+
+If you want to share the DMG with non-technical users (no Gatekeeper warning,
+no terminal) you need an Apple Developer Program membership ($99 / year):
+
+1. Create a **Developer ID Application** certificate at
+   <https://developer.apple.com/account/resources/certificates> and install
+   it in your login keychain.
+2. Generate an app-specific password at <https://appleid.apple.com>.
+3. Cache notarytool credentials once:
+   ```bash
+   xcrun notarytool store-credentials lwf-notary \
+     --apple-id "<your-apple-id>" \
+     --team-id "<your-team-id>" \
+     --password "<app-specific-password>"
+   ```
+4. Build with hardened runtime + entitlements (auto-detected when the
+   Developer ID cert is in the keychain), then notarize:
+   ```bash
+   ./script/build_release.sh
+   ./script/notarize.sh
+   ```
+5. Ship `dist/release/LocalWhisper-<version>.dmg`. End users drag-install
+   without any "unidentified developer" prompt.
+
 ## Development workflow
 
 For dev builds without /Applications:

@@ -41,6 +41,7 @@ final class AppState: ObservableObject {
         PushToTalkService.setTrigger(AppState.resolveTrigger(settings))
         SoundService.shared.isEnabled = settings.playSounds
         applyLaunchAtLoginSetting()
+        showOnboardingIfNeeded()
         observeAudioLevel()
         observeMicSetting()
         observeTriggerSetting()
@@ -222,6 +223,25 @@ final class AppState: ObservableObject {
         accessibilityPollTimer = nil
         pushToTalkService.stop()
         await whisperService.shutdown()
+    }
+
+    func showOnboardingIfNeeded() {
+        let modelExists = FileManager.default.fileExists(atPath: settings.modelPath)
+        let needsOnboarding = !settings.hasCompletedOnboarding || !modelExists
+        guard needsOnboarding else { return }
+        DispatchQueue.main.async { [weak self] in
+            OnboardingWindowController.shared.show { [weak self] in
+                self?.settings.hasCompletedOnboarding = true
+                self?.scheduleWarmup()
+            }
+        }
+    }
+
+    func showOnboarding() {
+        OnboardingWindowController.shared.show { [weak self] in
+            self?.settings.hasCompletedOnboarding = true
+            self?.scheduleWarmup()
+        }
     }
 
     func copyLastTranscript() {

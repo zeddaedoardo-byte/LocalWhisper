@@ -102,22 +102,54 @@ find "$APP_BUNDLE" -print0 | while IFS= read -r -d '' f; do
 done
 
 echo "==> Code signing"
-SIGNING_HASH="$(security find-identity -p codesigning -v 2>/dev/null | awk '/Apple Development:/ {print $2; exit}')"
-if [[ -n "$SIGNING_HASH" ]]; then
-  echo "    using identity: $SIGNING_HASH"
-  IDENT_ARG=("--sign" "$SIGNING_HASH")
+APP_ENTITLEMENTS="$ROOT_DIR/Resources/Entitlements/app.entitlements"
+HELPER_ENTITLEMENTS="$ROOT_DIR/Resources/Entitlements/whisper-helper.entitlements"
+
+# Prefer Developer ID Application (notarizable) when available; fall back to
+# Apple Development (works for the dev's own machine but not notarizable);
+# fall back to ad-hoc as last resort. Set LWF_HARDENED_RUNTIME=1 to opt in to
+# hardened runtime + entitlements (required for notarization).
+DEVID_HASH="$(security find-identity -p codesigning -v 2>/dev/null | awk '/Developer ID Application:/ {print $2; exit}')"
+DEV_HASH="$(security find-identity -p codesigning -v 2>/dev/null | awk '/Apple Development:/ {print $2; exit}')"
+
+USE_RUNTIME=0
+if [[ -n "$DEVID_HASH" ]]; then
+  echo "    using Developer ID identity: $DEVID_HASH"
+  IDENT_ARG=("--sign" "$DEVID_HASH")
+  USE_RUNTIME=1
+elif [[ -n "$DEV_HASH" ]]; then
+  echo "    using Apple Development identity: $DEV_HASH"
+  IDENT_ARG=("--sign" "$DEV_HASH")
+  if [[ "${LWF_HARDENED_RUNTIME:-0}" == "1" ]]; then
+    USE_RUNTIME=1
+  fi
 else
-  echo "    no Apple Development identity found, signing ad-hoc"
+  echo "    no signing identity found, signing ad-hoc"
   IDENT_ARG=("--sign" "-")
 fi
 
-# Sign nested binaries first
+RUNTIME_ARGS=()
+if [[ "$USE_RUNTIME" == "1" ]]; then
+  RUNTIME_ARGS=("--options" "runtime")
+fi
+
+# Sign nested binaries first (whisper-cli / whisper-server) with their own
+# entitlements that allow Metal shader JIT.
 if [[ -d "$APP_RESOURCES/bin" ]]; then
   for nested in "$APP_RESOURCES"/bin/*; do
-    codesign --force "${IDENT_ARG[@]}" --timestamp=none "$nested"
+    HELPER_ARGS=()
+    if [[ "$USE_RUNTIME" == "1" && -f "$HELPER_ENTITLEMENTS" ]]; then
+      HELPER_ARGS=("--entitlements" "$HELPER_ENTITLEMENTS")
+    fi
+    codesign --force "${IDENT_ARG[@]}" "${RUNTIME_ARGS[@]}" "${HELPER_ARGS[@]}" --timestamp=none "$nested"
   done
 fi
-codesign --force "${IDENT_ARG[@]}" --identifier "$BUNDLE_ID" --timestamp=none "$APP_BUNDLE"
+
+APP_ARGS=()
+if [[ "$USE_RUNTIME" == "1" && -f "$APP_ENTITLEMENTS" ]]; then
+  APP_ARGS=("--entitlements" "$APP_ENTITLEMENTS")
+fi
+codesign --force "${IDENT_ARG[@]}" "${RUNTIME_ARGS[@]}" "${APP_ARGS[@]}" --identifier "$BUNDLE_ID" --timestamp=none "$APP_BUNDLE"
 
 echo "==> Building DMG"
 DMG_STAGE="/private/tmp/local-whisperflow-dmg-stage"

@@ -14,6 +14,29 @@
 "Auto Paste" = "Auto Paste";
 "Grant Accessibility…" = "Concedi Accessibility…";
 "Restart engine" = "Riavvia motore";
+
+/* Onboarding */
+"Continue" = "Continua";
+"Back" = "Indietro";
+"Finish" = "Fine";
+"Welcome to LocalWhisper" = "Benvenuto in LocalWhisper";
+"Offline voice transcription on your Mac. We'll set up the three things the app needs to dictate everywhere: microphone access, the global hotkey, and the Whisper model." = "Trascrizione vocale offline sul tuo Mac. Configuriamo insieme le tre cose che servono all'app: accesso al microfono, hotkey globale e modello Whisper.";
+"Microphone" = "Microfono";
+"LocalWhisper records audio locally to transcribe it. Audio never leaves your Mac." = "LocalWhisper registra l'audio in locale per trascriverlo. L'audio non lascia mai il tuo Mac.";
+"Microphone access granted" = "Accesso microfono concesso";
+"Microphone access not granted" = "Accesso microfono non concesso";
+"Re-check" = "Ricontrolla";
+"Grant microphone access" = "Concedi accesso al microfono";
+"Accessibility" = "Accessibility";
+"LocalWhisper needs Accessibility to capture the global hotkey (default: hold fn) and to paste the transcript into the active app. Open System Settings → Privacy & Security → Accessibility and enable LocalWhisper." = "LocalWhisper ha bisogno di Accessibility per intercettare l'hotkey globale (default: tieni fn) e incollare il trascritto nell'app attiva. Apri System Settings → Privacy & Security → Accessibility e abilita LocalWhisper.";
+"Accessibility granted" = "Accessibility concessa";
+"Accessibility not granted" = "Accessibility non concessa";
+"Open System Settings" = "Apri System Settings";
+"Whisper model" = "Modello Whisper";
+"We'll download %@ to ~/Library/Application Support/LocalWhisper/Models. The model runs entirely on your Mac." = "Scarichiamo %@ in ~/Library/Application Support/LocalWhisper/Models. Il modello gira completamente sul tuo Mac.";
+"Model installed" = "Modello installato";
+"All set" = "Tutto pronto";
+"Hold fn anywhere on your Mac to dictate. Release to transcribe and auto-paste. The app lives in the menu bar — click the three bars to change settings or stop it." = "Tieni fn ovunque sul Mac per dettare. Rilascia per trascrivere e incollare. L'app vive nella barra dei menu — click sulle tre barre per cambiare impostazioni o fermarla.";
 "Settings…" = "Impostazioni…";
 "Quit LocalWhisper" = "Esci da LocalWhisper";
 "Quit" = "Esci";

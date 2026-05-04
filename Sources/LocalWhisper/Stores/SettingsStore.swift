@@ -15,6 +15,7 @@ final class SettingsStore: ObservableObject {
         static let didSuggestPreset = "didSuggestPreset"
         static let launchAtLogin = "launchAtLogin"
         static let playSounds = "playSounds"
+        static let hasCompletedOnboarding = "hasCompletedOnboarding"
     }
 
     private let defaults: UserDefaults
@@ -78,6 +79,10 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(playSounds, forKey: Keys.playSounds) }
     }
 
+    @Published var hasCompletedOnboarding: Bool {
+        didSet { defaults.set(hasCompletedOnboarding, forKey: Keys.hasCompletedOnboarding) }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
@@ -117,6 +122,7 @@ final class SettingsStore: ObservableObject {
 
         self.launchAtLogin = defaults.object(forKey: Keys.launchAtLogin) as? Bool ?? false
         self.playSounds = defaults.object(forKey: Keys.playSounds) as? Bool ?? true
+        self.hasCompletedOnboarding = defaults.bool(forKey: Keys.hasCompletedOnboarding)
 
         let didSuggest = defaults.bool(forKey: Keys.didSuggestPreset)
         let storedPreset = defaults.string(forKey: Keys.performancePreset)
