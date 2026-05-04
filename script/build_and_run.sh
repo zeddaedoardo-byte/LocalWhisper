@@ -8,23 +8,26 @@ MIN_SYSTEM_VERSION="14.0"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SWIFT_BUILD_DIR="/private/tmp/local-whisperflow-swiftpm-build"
-DIST_DIR="/private/tmp/local-whisperflow-app"
-APP_BUNDLE="$DIST_DIR/$APP_NAME.app"
-APP_CONTENTS="$APP_BUNDLE/Contents"
+STAGE_DIR="/private/tmp/local-whisperflow-app"
+STAGE_BUNDLE="$STAGE_DIR/$APP_NAME.app"
+APP_BUNDLE="/Applications/$APP_NAME.app"
+APP_CONTENTS="$STAGE_BUNDLE/Contents"
 APP_MACOS="$APP_CONTENTS/MacOS"
 APP_RESOURCES="$APP_CONTENTS/Resources"
 APP_BINARY="$APP_MACOS/$APP_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
 ICON_SOURCE="$ROOT_DIR/Resources/AppIcon.icns"
+WHISPER_BIN_DIR="$ROOT_DIR/external/whisper.cpp/build/bin"
 SHORT_VERSION="${LWF_VERSION:-0.2.0}"
 BUILD_NUMBER="${LWF_BUILD:-$(date +%Y%m%d%H%M)}"
 
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
+pkill -f whisper-server >/dev/null 2>&1 || true
 
 swift build --scratch-path "$SWIFT_BUILD_DIR"
 BUILD_BINARY="$(swift build --scratch-path "$SWIFT_BUILD_DIR" --show-bin-path)/$APP_NAME"
 
-rm -rf "$APP_BUNDLE"
+rm -rf "$STAGE_BUNDLE"
 mkdir -p "$APP_MACOS" "$APP_RESOURCES"
 cp "$BUILD_BINARY" "$APP_BINARY"
 chmod +x "$APP_BINARY"
@@ -39,6 +42,13 @@ if [[ -d "$LOCALIZED_RESOURCES_SRC" ]]; then
     [[ -d "$lproj" ]] || continue
     cp -R "$lproj" "$APP_RESOURCES/"
   done
+fi
+
+if [[ -x "$WHISPER_BIN_DIR/whisper-cli" && -x "$WHISPER_BIN_DIR/whisper-server" ]]; then
+  mkdir -p "$APP_RESOURCES/bin"
+  cp "$WHISPER_BIN_DIR/whisper-cli" "$APP_RESOURCES/bin/"
+  cp "$WHISPER_BIN_DIR/whisper-server" "$APP_RESOURCES/bin/"
+  chmod +x "$APP_RESOURCES/bin/whisper-cli" "$APP_RESOURCES/bin/whisper-server"
 fi
 
 cat >"$INFO_PLIST" <<PLIST
@@ -83,13 +93,43 @@ cat >"$INFO_PLIST" <<PLIST
 </plist>
 PLIST
 
-xattr -cr "$APP_BUNDLE" 2>/dev/null || true
+# iCloud Drive can reapply com.apple.FinderInfo on every write; the staging
+# dir lives in /private/tmp so it does not, but xattr clean is cheap and stays
+# as a safety net for any future move.
+find "$STAGE_BUNDLE" -print0 | while IFS= read -r -d '' f; do
+  xattr -d com.apple.FinderInfo "$f" 2>/dev/null || true
+  xattr -d com.apple.fileprovider.fpfs#P "$f" 2>/dev/null || true
+done
 
 SIGNING_HASH="$(security find-identity -p codesigning -v 2>/dev/null | awk '/Apple Development:/ {print $2; exit}')"
 if [[ -n "$SIGNING_HASH" ]]; then
-  codesign --force --sign "$SIGNING_HASH" --identifier "$BUNDLE_ID" --timestamp=none "$APP_BUNDLE"
+  IDENT_ARG=("--sign" "$SIGNING_HASH")
 else
-  codesign --force --sign - --identifier "$BUNDLE_ID" --timestamp=none "$APP_BUNDLE"
+  IDENT_ARG=("--sign" "-")
+fi
+
+if [[ -d "$APP_RESOURCES/bin" ]]; then
+  for nested in "$APP_RESOURCES"/bin/*; do
+    codesign --force "${IDENT_ARG[@]}" --timestamp=none "$nested"
+  done
+fi
+codesign --force "${IDENT_ARG[@]}" --identifier "$BUNDLE_ID" --timestamp=none "$STAGE_BUNDLE"
+
+# Replace the running install in /Applications so dev iterations always pick
+# up the latest binary, embedded whisper.cpp, localized resources and
+# Info.plist. Keeping the stable signing identity means TCC permissions
+# survive across rebuilds.
+if [[ -d "$APP_BUNDLE" ]]; then
+  if [[ -w "/Applications" ]]; then
+    rm -rf "$APP_BUNDLE"
+  else
+    sudo rm -rf "$APP_BUNDLE"
+  fi
+fi
+if [[ -w "/Applications" ]]; then
+  cp -R "$STAGE_BUNDLE" "$APP_BUNDLE"
+else
+  sudo cp -R "$STAGE_BUNDLE" "$APP_BUNDLE"
 fi
 
 open_app() {
@@ -101,7 +141,7 @@ case "$MODE" in
     open_app
     ;;
   --debug|debug)
-    lldb -- "$APP_BINARY"
+    lldb -- "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
     ;;
   --logs|logs)
     open_app
