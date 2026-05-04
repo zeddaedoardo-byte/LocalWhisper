@@ -1,3 +1,4 @@
+import AppKit
 import AVFoundation
 import Combine
 import CoreAudio
@@ -44,6 +45,60 @@ final class AudioRecorderService: NSObject, ObservableObject {
     private var isPrepared: Bool = false
     private var deviceUIDApplied: String?
     private var idleTimer: Timer?
+    private var lifecycleObservers: [NSObjectProtocol] = []
+
+    override init() {
+        super.init()
+        registerLifecycleObservers()
+    }
+
+    deinit {
+        let observers = lifecycleObservers
+        for token in observers {
+            NotificationCenter.default.removeObserver(token)
+            NSWorkspace.shared.notificationCenter.removeObserver(token)
+        }
+    }
+
+    private func registerLifecycleObservers() {
+        let main = OperationQueue.main
+
+        // The OS posts this when the audio graph configuration changes —
+        // after sleep/wake, when a USB mic is plugged or yanked, when the
+        // user switches the system default in Sound preferences, etc. Tear
+        // the engine down so the next recording re-prepares it against the
+        // current device list.
+        let configToken = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: nil,
+            queue: main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.invalidateEngineForLifecycle() }
+        }
+
+        // Belt-and-braces: after the Mac wakes from sleep we tear the engine
+        // down regardless of whether configurationChangeNotification fires,
+        // because in practice the engine can keep "running" but produce only
+        // silence when the device backing it was suspended.
+        let wakeToken = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.invalidateEngineForLifecycle() }
+        }
+
+        lifecycleObservers = [configToken, wakeToken]
+    }
+
+    private func invalidateEngineForLifecycle() {
+        // Never tear down mid-recording — that would lose the current take.
+        if isRecording { return }
+        tearDownEngine()
+        Task { [weak self] in
+            await self?.prewarm()
+        }
+    }
 
     func prewarm() async {
         do {
