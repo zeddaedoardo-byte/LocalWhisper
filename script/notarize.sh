@@ -47,7 +47,7 @@ if ! security find-identity -p codesigning -v 2>/dev/null | grep -q "Developer I
   exit 1
 fi
 
-CDV="$(codesign -dv "$APP_BUNDLE" 2>&1 | grep -E '^Authority=Developer ID Application' | head -1 || true)"
+CDV="$(codesign -dv --verbose=2 "$APP_BUNDLE" 2>&1 | grep -E '^Authority=Developer ID Application' | head -1 || true)"
 if [[ -z "$CDV" ]]; then
   echo "App bundle is not signed with Developer ID Application. Re-run build_release.sh after the cert is installed." >&2
   exit 1

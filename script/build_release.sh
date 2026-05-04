@@ -129,8 +129,11 @@ else
 fi
 
 RUNTIME_ARGS=()
+TIMESTAMP_ARG=("--timestamp=none")
 if [[ "$USE_RUNTIME" == "1" ]]; then
   RUNTIME_ARGS=("--options" "runtime")
+  # Notarization requires a secure timestamp from Apple's timestamp server.
+  TIMESTAMP_ARG=("--timestamp")
 fi
 
 # Sign nested binaries first (whisper-cli / whisper-server) with their own
@@ -141,7 +144,7 @@ if [[ -d "$APP_RESOURCES/bin" ]]; then
     if [[ "$USE_RUNTIME" == "1" && -f "$HELPER_ENTITLEMENTS" ]]; then
       HELPER_ARGS=("--entitlements" "$HELPER_ENTITLEMENTS")
     fi
-    codesign --force "${IDENT_ARG[@]}" "${RUNTIME_ARGS[@]}" "${HELPER_ARGS[@]}" --timestamp=none "$nested"
+    codesign --force "${IDENT_ARG[@]}" "${RUNTIME_ARGS[@]}" "${HELPER_ARGS[@]}" "${TIMESTAMP_ARG[@]}" "$nested"
   done
 fi
 
@@ -149,7 +152,7 @@ APP_ARGS=()
 if [[ "$USE_RUNTIME" == "1" && -f "$APP_ENTITLEMENTS" ]]; then
   APP_ARGS=("--entitlements" "$APP_ENTITLEMENTS")
 fi
-codesign --force "${IDENT_ARG[@]}" "${RUNTIME_ARGS[@]}" "${APP_ARGS[@]}" --identifier "$BUNDLE_ID" --timestamp=none "$APP_BUNDLE"
+codesign --force "${IDENT_ARG[@]}" "${RUNTIME_ARGS[@]}" "${APP_ARGS[@]}" --identifier "$BUNDLE_ID" "${TIMESTAMP_ARG[@]}" "$APP_BUNDLE"
 
 echo "==> Building DMG"
 DMG_STAGE="/private/tmp/local-whisperflow-dmg-stage"
