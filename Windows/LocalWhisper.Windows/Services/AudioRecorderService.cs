@@ -25,6 +25,25 @@ public sealed class AudioRecorderService : IDisposable
     public Task PrewarmAsync()
     {
         _ = AudioDeviceCatalog.ListInputDevices();
+
+        // Instantiate (and immediately release) a WasapiCapture so the
+        // WASAPI session, COM activation, and any device-permission prompts
+        // happen at startup instead of on the first push-to-talk.
+        try
+        {
+            var device = AudioDeviceCatalog.FindInputDevice(PreferredDeviceId);
+            if (device is not null)
+            {
+                using var probe = new WasapiCapture(device);
+                _ = probe.WaveFormat;
+            }
+        }
+        catch
+        {
+            // Prewarm is opportunistic; real recording will surface any
+            // genuine error with a proper message.
+        }
+
         return Task.CompletedTask;
     }
 
@@ -68,12 +87,17 @@ public sealed class AudioRecorderService : IDisposable
 
     public string StopRecording()
     {
-        WasapiCapture? capture;
+        WasapiCapture capture;
         ManualResetEventSlim? stopped;
-        MemoryStream? rawAudio;
-        WaveFormat? captureFormat;
-        string? filePath;
+        MemoryStream rawAudio;
+        WaveFormat captureFormat;
+        string filePath;
 
+        // Take exclusive ownership of the recording state in a single lock so
+        // a fresh StartRecordingAsync called immediately after cannot race
+        // with the finalization below. After this block, the recorder is
+        // ready to accept a new session even though we still need to flush
+        // the captured audio to disk.
         lock (_lock)
         {
             if (!_isRecording || _capture is null || _rawAudio is null || _captureFormat is null || _currentFilePath is null)
@@ -81,23 +105,45 @@ public sealed class AudioRecorderService : IDisposable
                 throw new InvalidOperationException("There is no active recording to stop.");
             }
 
-            _isRecording = false;
             capture = _capture;
             stopped = _recordingStopped;
             rawAudio = _rawAudio;
             captureFormat = _captureFormat;
             filePath = _currentFilePath;
+
+            _capture = null;
+            _rawAudio = null;
+            _captureFormat = null;
+            _recordingStopped = null;
+            _currentFilePath = null;
+            _isRecording = false;
+
+            capture.DataAvailable -= CaptureOnDataAvailable;
+            capture.RecordingStopped -= CaptureOnRecordingStopped;
         }
 
-        capture.StopRecording();
-        stopped?.Wait(TimeSpan.FromSeconds(3));
+        // Bridge handler: the field-based RecordingStopped handler was
+        // detached above to avoid cross-talk with a fresh recording session;
+        // attach a local one so we can still wait for the capture thread to
+        // drain.
+        EventHandler<StoppedEventArgs> bridgeStopped = (_, _) => stopped?.Set();
+        capture.RecordingStopped += bridgeStopped;
 
-        lock (_lock)
+        try
         {
+            capture.StopRecording();
+            stopped?.Wait(TimeSpan.FromSeconds(3));
+
             rawAudio.Position = 0;
             WriteWavFile(rawAudio, captureFormat, filePath);
             LevelChanged?.Invoke(this, -160);
-            DisposeCapture();
+        }
+        finally
+        {
+            capture.RecordingStopped -= bridgeStopped;
+            capture.Dispose();
+            rawAudio.Dispose();
+            stopped?.Dispose();
         }
 
         return filePath;

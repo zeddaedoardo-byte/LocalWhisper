@@ -9,6 +9,23 @@ public sealed class WhisperServerWorker
     private static readonly object RegistryLock = new();
     private static readonly HashSet<Process> RunningServers = [];
 
+    // Reused across all transcriptions: creating a fresh HttpClient per request
+    // exhausts the socket pool after dozens of calls.
+    private static readonly HttpClient TranscribeClient = new()
+    {
+        Timeout = TimeSpan.FromMinutes(10)
+    };
+
+    private static readonly HttpClient ReadyProbeClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(2)
+    };
+
+    // The whisper-server should already produce a valid WAV header in <1 KB,
+    // but a real recording with any content easily exceeds this. Files smaller
+    // than this are almost certainly truncated or corrupted captures.
+    private const long MinValidWavBytes = 1024;
+
     private readonly object _stateLock = new();
     private readonly string _host = "127.0.0.1";
     private readonly int _port;
@@ -51,17 +68,27 @@ public sealed class WhisperServerWorker
 
     public async Task EnsureRunningAsync(string serverBinaryPath, string modelPath, PerformancePreset preset, CancellationToken cancellationToken)
     {
-        if (IsRunning &&
+        var configMatches =
             string.Equals(_currentBinary, serverBinaryPath, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(_currentModel, modelPath, StringComparison.OrdinalIgnoreCase) &&
-            Equals(_currentPreset, preset))
+            Equals(_currentPreset, preset);
+
+        if (IsRunning && configMatches)
         {
             if (_readyTask is not null)
             {
                 await _readyTask.WaitAsync(cancellationToken);
             }
 
-            return;
+            // The process is alive and warmup completed, but the HTTP
+            // endpoint can still be unresponsive (deadlock, GPU stall, model
+            // crash). A cheap probe here catches that within 2s instead of
+            // letting the next transcription block on the 10-minute upload
+            // timeout.
+            if (await PingAsync(TimeSpan.FromSeconds(2)))
+            {
+                return;
+            }
         }
 
         await StopAsync();
@@ -74,7 +101,8 @@ public sealed class WhisperServerWorker
 
     public async Task<string> TranscribeAsync(string audioPath, string language, CancellationToken cancellationToken)
     {
-        using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
+        ValidateAudioFile(audioPath);
+
         using var form = new MultipartFormDataContent();
         await using var stream = File.OpenRead(audioPath);
         using var fileContent = new StreamContent(stream);
@@ -86,7 +114,7 @@ public sealed class WhisperServerWorker
         form.Add(fileContent, "file", Path.GetFileName(audioPath));
 
         var endpoint = $"http://{_host}:{_port}/inference";
-        using var response = await client.PostAsync(endpoint, form, cancellationToken);
+        using var response = await TranscribeClient.PostAsync(endpoint, form, cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
@@ -100,6 +128,21 @@ public sealed class WhisperServerWorker
         }
 
         return text;
+    }
+
+    private static void ValidateAudioFile(string audioPath)
+    {
+        if (!File.Exists(audioPath))
+        {
+            throw new FileNotFoundException("Recorded audio file is missing.", audioPath);
+        }
+
+        var info = new FileInfo(audioPath);
+        if (info.Length < MinValidWavBytes)
+        {
+            throw new InvalidOperationException(
+                $"Recorded audio is too small ({info.Length} bytes); the capture likely failed.");
+        }
     }
 
     public async Task StopAsync()
@@ -206,6 +249,11 @@ public sealed class WhisperServerWorker
             throw new InvalidOperationException("Could not start whisper-server.exe.");
         }
 
+        // Best-effort: bind the child to a Job Object so it dies with the
+        // parent even on hard crash. Falls back silently to the explicit
+        // shutdown path on legacy systems where the API is unavailable.
+        ChildProcessJob.TryAssign(process);
+
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
 
@@ -220,13 +268,12 @@ public sealed class WhisperServerWorker
             _currentBinary = serverBinaryPath;
             _currentModel = modelPath;
             _currentPreset = preset;
-            _readyTask = PollReadyAsync(process, TimeSpan.FromMinutes(10));
+            _readyTask = PollReadyAsync(process, TimeSpan.FromSeconds(90));
         }
     }
 
     private async Task PollReadyAsync(Process process, TimeSpan timeout)
     {
-        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
         var deadline = DateTimeOffset.UtcNow.Add(timeout);
         var endpoint = $"http://{_host}:{_port}/";
 
@@ -239,7 +286,7 @@ public sealed class WhisperServerWorker
 
             try
             {
-                using var response = await client.GetAsync(endpoint);
+                using var response = await ReadyProbeClient.GetAsync(endpoint);
                 if ((int)response.StatusCode < 500)
                 {
                     return;
@@ -253,7 +300,27 @@ public sealed class WhisperServerWorker
             await Task.Delay(TimeSpan.FromSeconds(1));
         }
 
-        throw new TimeoutException("Whisper server failed to start within 10 minutes.");
+        throw new TimeoutException(
+            $"Whisper server failed to start within {timeout.TotalSeconds:F0} seconds. {StderrSnapshot()}");
+    }
+
+    public async Task<bool> PingAsync(TimeSpan timeout)
+    {
+        if (!IsRunning)
+        {
+            return false;
+        }
+
+        try
+        {
+            using var cts = new CancellationTokenSource(timeout);
+            using var response = await ReadyProbeClient.GetAsync($"http://{_host}:{_port}/", cts.Token);
+            return (int)response.StatusCode < 500;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private string StderrSnapshot()
