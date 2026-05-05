@@ -1,0 +1,7 @@
+external/
+artifacts/
+*.bin
+*.gguf
+*.wav
+LocalWhisper.Windows/bin/
+LocalWhisper.Windows/obj/
