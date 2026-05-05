@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using System.Net;
 using System.Net.Http;
+using System.Net.Sockets;
 using LocalWhisper.Windows.Models;
 
 namespace LocalWhisper.Windows.Services;
@@ -28,18 +30,16 @@ public sealed class WhisperServerWorker
 
     private readonly object _stateLock = new();
     private readonly string _host = "127.0.0.1";
-    private readonly int _port;
+    // Port is allocated freshly per Start() so we never accept readiness from
+    // a stale listener (orphan whisper-server, Mac sibling, unrelated app)
+    // bound to a hard-coded fixed port.
+    private int _port;
     private Process? _process;
     private string? _currentBinary;
     private string? _currentModel;
     private PerformancePreset? _currentPreset;
     private Task? _readyTask;
     private readonly List<string> _stderrBuffer = [];
-
-    public WhisperServerWorker(int port = 18642)
-    {
-        _port = port;
-    }
 
     public bool IsRunning => _process?.HasExited == false;
 
@@ -185,6 +185,8 @@ public sealed class WhisperServerWorker
             throw new FileNotFoundException("Whisper model was not found.", modelPath);
         }
 
+        _port = AllocateFreeLoopbackPort();
+
         var startInfo = new ProcessStartInfo
         {
             FileName = serverBinaryPath,
@@ -320,6 +322,25 @@ public sealed class WhisperServerWorker
         catch
         {
             return false;
+        }
+    }
+
+    private static int AllocateFreeLoopbackPort()
+    {
+        // Bind to port 0 on the loopback interface so the OS hands us an
+        // available ephemeral port, then release it. There is a tiny TOCTOU
+        // window before whisper-server binds, but if another process grabs
+        // the port the child will exit immediately on bind failure and
+        // PollReadyAsync surfaces that via process.HasExited + stderr.
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        try
+        {
+            return ((IPEndPoint)listener.LocalEndpoint).Port;
+        }
+        finally
+        {
+            listener.Stop();
         }
     }
 
