@@ -151,11 +151,9 @@ final class OnboardingViewModel: ObservableObject {
     // MARK: - Helpers
 
     private static func recommendedModel(for profile: HardwareProfile) -> WhisperModelInfo {
-        // Apple Silicon with 16+ GB RAM: Turbo (1.5 GB) hits the sweet spot of
-        // accuracy and speed. Smaller-RAM Apple Silicon and Intel Macs get
-        // Medium for a smaller footprint and CPU-friendlier inference.
-        if profile.isAppleSilicon, profile.physicalMemoryGB >= 12,
-           let turbo = WhisperModelCatalog.info(forID: "large-v3-turbo") {
+        // Turbo is the default: it keeps Large V3 quality characteristics while
+        // cutting the model footprint and latency enough for everyday dictation.
+        if let turbo = WhisperModelCatalog.info(forID: "large-v3-turbo") {
             return turbo
         }
         if let medium = WhisperModelCatalog.info(forID: "medium") {

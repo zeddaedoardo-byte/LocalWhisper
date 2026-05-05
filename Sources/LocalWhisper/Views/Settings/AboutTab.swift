@@ -19,7 +19,7 @@ struct AboutTab: View {
             Text("Version \(version)")
                 .foregroundStyle(.secondary)
 
-            Text("Offline voice transcription on Apple Silicon with Whisper Large V3.")
+            Text("Offline voice transcription on Apple Silicon with Whisper Large V3 Turbo.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 24)

@@ -157,7 +157,7 @@
 
 /* About */
 "Version %@" = "Versione %@";
-"Offline voice transcription on Apple Silicon with Whisper Large V3." = "Trascrizione vocale offline su Apple Silicon con Whisper Large V3.";
+"Offline voice transcription on Apple Silicon with Whisper Large V3 Turbo." = "Trascrizione vocale offline su Apple Silicon con Whisper Large V3 Turbo.";
 
 /* Downloader */
 "Model" = "Modello";

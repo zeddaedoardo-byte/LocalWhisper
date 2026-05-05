@@ -43,7 +43,7 @@ fi
 ok "macOS $(sw_vers -productVersion) on $ARCH"
 
 bold "==> Building whisper.cpp + downloading model"
-echo "    This step can take 5-15 minutes the first time (model is ~3 GB)."
+echo "    This step can take 5-15 minutes the first time (model is ~1.5 GB)."
 "$ROOT_DIR/script/setup_whisper_cpp.sh"
 ok "whisper.cpp ready"
 

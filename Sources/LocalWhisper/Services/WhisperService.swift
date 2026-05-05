@@ -11,7 +11,7 @@ enum WhisperError: LocalizedError {
         case .missingBinary(let path):
             "whisper-server binary not found or not executable: \(path)"
         case .missingModel(let path):
-            "Whisper Large V3 model not found: \(path)"
+            "Whisper model not found: \(path)"
         case .transcriptionFailed(let message):
             "Transcription failed: \(message)"
         case .emptyTranscript:

@@ -187,7 +187,7 @@ public sealed class AppState : INotifyPropertyChanged
     {
         try
         {
-            var path = await _modelDownloader.DownloadLargeV3Async(CancellationToken.None);
+            var path = await _modelDownloader.DownloadLargeV3TurboAsync(CancellationToken.None);
             _settings.ModelPath = path;
             _settings.HasCompletedOnboarding = true;
             ScheduleWarmup();

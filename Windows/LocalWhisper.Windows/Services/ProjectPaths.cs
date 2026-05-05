@@ -34,7 +34,7 @@ public static class ProjectPaths
     }
 
     public static string DefaultModelPath =>
-        Path.Combine(ModelsDirectory, "ggml-large-v3.bin");
+        Path.Combine(ModelsDirectory, "ggml-large-v3-turbo.bin");
 
     public static string DefaultWhisperCliPath
     {

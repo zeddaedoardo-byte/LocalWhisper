@@ -1,6 +1,6 @@
 # LocalWhisper
 
-LocalWhisper is a local macOS menu bar dictation app inspired by WhisperFlow. Hold a hotkey, speak, release — Whisper Large V3 transcribes everything offline on Apple Silicon (Metal) and the text lands in the active app.
+LocalWhisper is a local macOS menu bar dictation app inspired by WhisperFlow. Hold a hotkey, speak, release — Whisper Large V3 Turbo transcribes everything offline on Apple Silicon (Metal) and the text lands in the active app.
 
 ![icon](Resources/icon-source.png)
 
@@ -32,7 +32,7 @@ cd LocalWhisper
 The installer:
 
 1. Clones and statically builds `whisper.cpp` (Metal + Accelerate).
-2. Downloads Whisper Large V3 (~2.9 GiB) into `~/Library/Application Support/LocalWhisper/Models/`.
+2. Downloads Whisper Large V3 Turbo (~1.5 GiB) into `~/Library/Application Support/LocalWhisper/Models/`.
 3. Builds the Swift app in release mode.
 4. Embeds `whisper-cli` and `whisper-server` inside the bundle's `Contents/Resources/bin/`.
 5. Signs the bundle with your Apple Development identity if available, otherwise ad-hoc.
@@ -120,7 +120,7 @@ Regenerate the icon:
 
 - Press the hotkey → AVAudioEngine is already pre-warmed → recording starts in <200 ms.
 - Audio captured as PCM 16 kHz mono WAV via AVAudioConverter into a temp file.
-- Release the hotkey → multipart POST to `127.0.0.1:18642/inference` (the `whisper-server` child process keeps the 3 GB model resident).
+- Release the hotkey → multipart POST to `127.0.0.1:18642/inference` (the `whisper-server` child process keeps the model resident).
 - Server returns text → app copies to clipboard → optionally pastes via synthetic Cmd-V.
 
 ## Credits

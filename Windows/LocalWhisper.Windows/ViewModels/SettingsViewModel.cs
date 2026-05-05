@@ -133,7 +133,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     {
         var dialog = new OpenFileDialog
         {
-            Title = "Select ggml-large-v3.bin",
+            Title = "Select ggml-large-v3-turbo.bin",
             Filter = "Whisper model (*.bin)|*.bin|All files (*.*)|*.*",
             CheckFileExists = true
         };

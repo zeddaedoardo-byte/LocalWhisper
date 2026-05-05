@@ -83,7 +83,7 @@ cat >"$INFO_PLIST" <<PLIST
   <key>NSHighResolutionCapable</key>
   <true/>
   <key>NSMicrophoneUsageDescription</key>
-  <string>LocalWhisper records microphone audio and transcribes it locally with Whisper Large V3.</string>
+  <string>LocalWhisper records microphone audio and transcribes it locally with Whisper Large V3 Turbo.</string>
   <key>CFBundleDevelopmentRegion</key>
   <string>en</string>
   <key>CFBundleLocalizations</key>

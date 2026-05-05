@@ -1,8 +1,8 @@
 import Foundation
 
 struct WhisperModelInfo: Identifiable, Hashable {
-    let id: String           // e.g. "large-v3"
-    let filename: String     // e.g. "ggml-large-v3.bin"
+    let id: String           // e.g. "large-v3-turbo"
+    let filename: String     // e.g. "ggml-large-v3-turbo.bin"
     let label: String
     let approxMB: Int
     let downloadURL: URL
@@ -18,16 +18,6 @@ struct WhisperModelInfo: Identifiable, Hashable {
 enum WhisperModelCatalog {
     static let models: [WhisperModelInfo] = [
         .init(
-            id: "large-v3",
-            filename: "ggml-large-v3.bin",
-            label: "Large V3 (3 GB, max accuracy)",
-            approxMB: 3094,
-            downloadURL: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin")!,
-            multilingual: true,
-            coreMLEncoderURL: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-encoder.mlmodelc.zip"),
-            coreMLEncoderApproxMB: 180
-        ),
-        .init(
             id: "large-v3-turbo",
             filename: "ggml-large-v3-turbo.bin",
             label: "Large V3 Turbo (~1.5 GB, ~3× faster)",
@@ -36,6 +26,16 @@ enum WhisperModelCatalog {
             multilingual: true,
             coreMLEncoderURL: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-encoder.mlmodelc.zip"),
             coreMLEncoderApproxMB: 70
+        ),
+        .init(
+            id: "large-v3",
+            filename: "ggml-large-v3.bin",
+            label: "Large V3 (3 GB, max accuracy)",
+            approxMB: 3094,
+            downloadURL: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin")!,
+            multilingual: true,
+            coreMLEncoderURL: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-encoder.mlmodelc.zip"),
+            coreMLEncoderApproxMB: 180
         ),
         .init(
             id: "large-v3-q5_0",

@@ -72,10 +72,10 @@
                       Content="Browse"
                       Command="{Binding BrowseModelCommand}" />
             </Grid>
-            <TextBlock Style="{StaticResource HelpText}" Text="Default path: %LOCALAPPDATA%\LocalWhisper\Models\ggml-large-v3.bin." />
+            <TextBlock Style="{StaticResource HelpText}" Text="Default path: %LOCALAPPDATA%\LocalWhisper\Models\ggml-large-v3-turbo.bin." />
 
             <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
-              <Button Content="Download Large V3"
+              <Button Content="Download Large V3 Turbo"
                       Command="{Binding DownloadModelCommand}" />
               <Button Content="Reset paths"
                       Command="{Binding ResetPathsCommand}" />

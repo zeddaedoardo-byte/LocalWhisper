@@ -10,7 +10,7 @@ The product behavior mirrors the Mac app:
 - WASAPI microphone capture
 - 16 kHz mono WAV handoff to `whisper.cpp`
 - persistent `whisper-server.exe` on `127.0.0.1:18642`
-- offline transcription with Whisper Large V3 by default
+- offline transcription with Whisper Large V3 Turbo by default
 - clipboard copy and optional `Ctrl+V` auto-paste
 
 ## Requirements
@@ -23,7 +23,7 @@ The product behavior mirrors the Mac app:
 
 Optional acceleration depends on the machine:
 
-- CPU baseline works everywhere but can be slow with Large V3.
+- CPU baseline works everywhere but can still be slow with Large V3 Turbo.
 - CUDA is the best path for NVIDIA machines.
 - Vulkan is the most useful cross-vendor GPU path.
 - OpenVINO can be evaluated for Intel systems.
@@ -66,16 +66,16 @@ Windows\artifacts\LocalWhisper-win-x64
 
 Launch `LocalWhisper.exe`. Open Settings from the tray icon and either:
 
-- download Large V3 from the Whisper tab, or
-- select an existing `ggml-large-v3.bin`.
+- download Large V3 Turbo from the Whisper tab, or
+- select an existing `ggml-large-v3-turbo.bin`.
 
 The default model location is:
 
 ```text
-%LOCALAPPDATA%\LocalWhisper\Models\ggml-large-v3.bin
+%LOCALAPPDATA%\LocalWhisper\Models\ggml-large-v3-turbo.bin
 ```
 
-Do not put the model under OneDrive or another synced folder. Large V3 is read
+Do not put the model under OneDrive or another synced folder. The model is read
 heavily during cold start and should live on a local disk.
 
 ## Windows-specific notes

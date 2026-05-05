@@ -139,7 +139,7 @@ public sealed class WhisperServerWorker
 
         if (!File.Exists(modelPath))
         {
-            throw new FileNotFoundException("Whisper Large V3 model was not found.", modelPath);
+            throw new FileNotFoundException("Whisper model was not found.", modelPath);
         }
 
         var startInfo = new ProcessStartInfo

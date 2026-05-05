@@ -54,7 +54,8 @@ public sealed class SettingsStore
             settings.WhisperBinaryPath = ProjectPaths.DefaultWhisperCliPath;
         }
 
-        if (string.IsNullOrWhiteSpace(settings.ModelPath))
+        if (string.IsNullOrWhiteSpace(settings.ModelPath)
+            || string.Equals(settings.ModelPath, LegacyLargeV3ModelPath(), StringComparison.OrdinalIgnoreCase))
         {
             settings.ModelPath = ProjectPaths.DefaultModelPath;
         }
@@ -84,4 +85,7 @@ public sealed class SettingsStore
             File.WriteAllText(ProjectPaths.SettingsPath, json);
         }
     }
+
+    private static string LegacyLargeV3ModelPath() =>
+        Path.Combine(ProjectPaths.ModelsDirectory, "ggml-large-v3.bin");
 }

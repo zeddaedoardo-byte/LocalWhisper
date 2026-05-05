@@ -44,9 +44,9 @@ public sealed class ModelDownloader : INotifyPropertyChanged
         private set => SetField(ref _lastError, value);
     }
 
-    public async Task<string> DownloadLargeV3Async(CancellationToken cancellationToken)
+    public async Task<string> DownloadLargeV3TurboAsync(CancellationToken cancellationToken)
     {
-        var model = WhisperModelInfo.LargeV3;
+        var model = WhisperModelInfo.LargeV3Turbo;
         Directory.CreateDirectory(ProjectPaths.ModelsDirectory);
         var destination = Path.Combine(ProjectPaths.ModelsDirectory, model.FileName);
         if (File.Exists(destination))

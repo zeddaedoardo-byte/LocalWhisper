@@ -37,7 +37,7 @@ public partial class HudWindow : Window
         {
             _hideTimer.Stop();
             TitleText.Text = "Transcribing";
-            DetailText.Text = "Whisper Large V3 is working locally";
+            DetailText.Text = "Whisper Large V3 Turbo is working locally";
             LevelBar.Visibility = Visibility.Collapsed;
             PlaceNearBottom();
             Show();

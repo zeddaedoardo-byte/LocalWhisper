@@ -110,7 +110,10 @@ final class SettingsStore: ObservableObject {
 
         let storedModel = defaults.string(forKey: Keys.modelPath)
         let resolvedModel = ProjectPaths.defaultModelURL.path
-        if let storedModel, FileManager.default.fileExists(atPath: storedModel) {
+        let legacyDefaultModel = SettingsStore.legacyLargeV3ModelPath()
+        if let storedModel,
+           storedModel != legacyDefaultModel,
+           FileManager.default.fileExists(atPath: storedModel) {
             self.modelPath = storedModel
         } else {
             self.modelPath = resolvedModel
@@ -176,5 +179,11 @@ final class SettingsStore: ObservableObject {
 
         return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
             ?? candidates[0]
+    }
+
+    private static func legacyLargeV3ModelPath() -> String {
+        ProjectPaths.applicationSupportModelsDir
+            .appendingPathComponent("ggml-large-v3.bin")
+            .path
     }
 }

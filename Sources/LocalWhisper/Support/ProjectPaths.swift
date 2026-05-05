@@ -34,11 +34,11 @@ enum ProjectPaths {
     }
 
     static var defaultModelURL: URL {
-        let asURL = applicationSupportModelsDir.appendingPathComponent("ggml-large-v3.bin")
+        let asURL = applicationSupportModelsDir.appendingPathComponent("ggml-large-v3-turbo.bin")
         if FileManager.default.fileExists(atPath: asURL.path) {
             return asURL
         }
-        let projectURL = projectRoot.appendingPathComponent("Models/ggml-large-v3.bin")
+        let projectURL = projectRoot.appendingPathComponent("Models/ggml-large-v3-turbo.bin")
         if FileManager.default.fileExists(atPath: projectURL.path) {
             return projectURL
         }
