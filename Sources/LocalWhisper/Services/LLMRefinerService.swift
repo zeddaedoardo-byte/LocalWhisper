@@ -69,21 +69,53 @@ final class LLMRefinerService {
     // Returns the refined text on success, or `original` on any failure.
     // Never throws; caller doesn't need to handle errors — this is a quality
     // booster, not a critical step in the pipeline.
-    func refine(_ original: String, style: Style, serverBinaryPath: String, modelPath: String) async -> String {
+    //
+    // `maxTotalSeconds` is the END-TO-END budget covering server cold-start,
+    // warmup readiness polling, and generation combined. It exists because
+    // `worker.ensureRunning` can legitimately wait up to 60s on a model
+    // that's loading for the first time — without an outer cap, a user who
+    // toggles refinement on while dictating would experience a paste hang
+    // for tens of seconds. Default 6s = enough for warm calls and small
+    // models; cold-start callers (retroactive polish) override to ~30s
+    // because the user has explicitly opted in and accepts the wait.
+    func refine(
+        _ original: String,
+        style: Style,
+        serverBinaryPath: String,
+        modelPath: String,
+        maxTotalSeconds: Double = 6.0
+    ) async -> String {
         let trimmed = original.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return original }
 
-        do {
-            try await worker.ensureRunning(serverBinaryPath: serverBinaryPath, modelPath: modelPath)
-            guard let endpoint = await worker.endpoint else { return original }
-
-            let refined = try await postRefinement(text: trimmed, style: style, baseURL: endpoint)
-            if Self.isPlausibleRefinement(original: trimmed, refined: refined, style: style) {
-                return refined
+        // Race the actual refinement against an absolute deadline. First
+        // result wins; the loser is cancelled. URLSession honors task
+        // cancellation, so an in-flight HTTP call aborts cleanly. The
+        // ensureRunning startup poll also yields cooperatively.
+        return await withTaskGroup(of: String.self) { group in
+            group.addTask { [weak self] in
+                guard let self else { return original }
+                do {
+                    try await self.worker.ensureRunning(serverBinaryPath: serverBinaryPath, modelPath: modelPath)
+                    guard let endpoint = await self.worker.endpoint else { return original }
+                    let refined = try await self.postRefinement(text: trimmed, style: style, baseURL: endpoint)
+                    if Self.isPlausibleRefinement(original: trimmed, refined: refined, style: style) {
+                        return refined
+                    }
+                    return original
+                } catch {
+                    return original
+                }
             }
-            return original
-        } catch {
-            return original
+            group.addTask {
+                let nanos = UInt64(maxTotalSeconds * 1_000_000_000)
+                try? await Task.sleep(nanoseconds: nanos)
+                return original
+            }
+            // First completion wins, cancel the other.
+            let result = await group.next() ?? original
+            group.cancelAll()
+            return result
         }
     }
 

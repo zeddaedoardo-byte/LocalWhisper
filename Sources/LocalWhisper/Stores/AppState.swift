@@ -1,4 +1,5 @@
 import AVFoundation
+import AppKit
 import Combine
 import Foundation
 
@@ -379,6 +380,13 @@ final class AppState: ObservableObject {
         // its own output through the normal pipeline.
         guard status != .recording, status != .transcribing else { return }
 
+        // Capture the pasteboard's monotonic change counter BEFORE the async
+        // refinement starts. If it changes during the wait — because the
+        // user copied a URL, a password, or anything else while waiting for
+        // the LLM — we drop the polished result instead of trampling their
+        // current clipboard with stale dictation text.
+        let initialChangeCount = NSPasteboard.general.changeCount
+
         retroactivePolishTask?.cancel()
         retroactivePolishTask = Task { [weak self] in
             guard let self else { return }
@@ -386,16 +394,26 @@ final class AppState: ObservableObject {
             self.status = .transcribing
             self.hudController.update(state: .transcribing)
 
+            // Generous budget here: this path is explicitly user-initiated
+            // (they flipped the toggle), so a cold-start wait is acceptable.
             let polished = await self.llmRefiner.refine(
                 original,
                 style: .polish,
                 serverBinaryPath: self.settings.llmServerBinaryPath,
-                modelPath: self.settings.llmModelPath
+                modelPath: self.settings.llmModelPath,
+                maxTotalSeconds: 30.0
             )
 
-            // Only commit the polished result if it changed; otherwise
-            // silently restore the previous status.
-            if polished != original {
+            // Three-way staleness check before committing:
+            //   1. Task wasn't cancelled (e.g. by a newer toggle event).
+            //   2. lastTranscript hasn't been overwritten by a fresh dictation.
+            //   3. Pasteboard hasn't been written by the user in the meantime.
+            // Any failure -> drop result, restore status, leave clipboard alone.
+            let stillFresh = !Task.isCancelled
+                && self.lastTranscript == original
+                && NSPasteboard.general.changeCount == initialChangeCount
+
+            if stillFresh && polished != original {
                 self.lastTranscript = polished
                 self.clipboardService.copy(polished)
                 self.status = .completed
@@ -410,6 +428,16 @@ final class AppState: ObservableObject {
     private static func previewSnippet(_ text: String) -> String {
         let prefix = text.prefix(72)
         return prefix.count < text.count ? String(prefix) + "…" : String(prefix)
+    }
+
+    // The Italian diacritic fixer is safe on auto / it / it-* / Italian
+    // explicit language settings. For an explicit non-Italian language we
+    // skip it so English/German/French dictations don't accidentally get
+    // Italian accents grafted onto rare proper-noun substrings.
+    private static func shouldRunDiacriticFixer(language: String) -> Bool {
+        let lang = language.trimmingCharacters(in: .whitespaces).lowercased()
+        if lang.isEmpty || lang == "auto" { return true }
+        return lang == "it" || lang.hasPrefix("it-") || lang == "italian"
     }
 
     private func applyLaunchAtLoginSetting() {
@@ -517,11 +545,16 @@ final class AppState: ObservableObject {
             )
             transcribeSucceeded = true
 
-            // Deterministic Italian diacritic restoration: microsecond-fast,
-            // safe on any language (no English word matches the entries),
-            // catches the most common Whisper-Turbo misses (perché, così,
-            // più, già, può, città, …) before the LLM call.
-            let rawTranscript = ItalianDiacriticFixer.fix(whisperOutput)
+            // Deterministic Italian diacritic restoration: microsecond-fast.
+            // Gated on Italian-friendly language settings (auto or it) so a
+            // user explicitly transcribing English doesn't get false-positive
+            // accent edits on words like "città" inside English brand names.
+            let rawTranscript: String
+            if Self.shouldRunDiacriticFixer(language: settings.language) {
+                rawTranscript = ItalianDiacriticFixer.fix(whisperOutput)
+            } else {
+                rawTranscript = whisperOutput
+            }
 
             // Optional refinement: never blocks or fails the pipeline. The
             // refiner returns the original on any timeout, error, or

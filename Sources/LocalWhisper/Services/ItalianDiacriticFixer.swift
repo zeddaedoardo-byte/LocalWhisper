@@ -50,12 +50,15 @@ enum ItalianDiacriticFixer {
         ("possibilita", "possibilità"),
         ("societa",     "società"),
         ("attivita",    "attività"),
-        ("eta",         "età"),
-        ("meta",        "metà"),
-        ("papa",        "papà"),       // father (papa as Pope is correctly "Papa" capitalized; capitalization rule below preserves it)
-        ("pieta",       "pietà"),
+        // Removed: "eta" / "meta" / "papa" / "pieta" / "tribu". Each has a
+        // legitimate non-accented form that would be corrupted by the fixer:
+        // - "Meta" / "META": brand name, English preposition, proper noun.
+        // - "ETA": acronym (Estimated Time of Arrival).
+        // - "Papa" / "PAPA": "the Pope" (Italian capitalized) or surname.
+        // - "Pieta" / "Tribu": rare proper nouns / non-Italian forms.
+        // Italian "età", "metà", "papà", "pietà", "tribù" without accents
+        // are real ambiguities; let the LLM (or the user) handle them.
         ("virtu",       "virtù"),
-        ("tribu",       "tribù"),
         ("gioventu",    "gioventù"),
         ("schiavitu",   "schiavitù"),
         ("servitu",     "servitù"),
