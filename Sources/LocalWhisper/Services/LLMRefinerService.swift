@@ -111,6 +111,12 @@ final class LLMRefinerService {
             "n_predict": maxTokens,
             "max_tokens": maxTokens,
             "stream": false,
+            // Qwen 3 family ships with thinking mode ENABLED by default,
+            // which dumps a long internal monologue into `reasoning_content`
+            // and leaves `content` empty when max_tokens runs out. This kwarg
+            // disables it. Models that don't recognize it (Gemma, Llama)
+            // silently ignore the field.
+            "chat_template_kwargs": ["enable_thinking": false],
             // Cut generation as soon as a known preamble or commentary leak
             // appears. Combined with the system prompt, this catches the
             // common failure modes for small models.

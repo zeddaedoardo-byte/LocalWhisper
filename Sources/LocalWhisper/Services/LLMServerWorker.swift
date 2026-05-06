@@ -146,13 +146,17 @@ actor LLMServerWorker {
         //                          from swapping out the model between dictations
         //                          (which would tank cold-warm latency).
         //   --threads -1        : let llama.cpp pick CPU thread count.
+        // Note: recent llama-server versions (Homebrew, 2026) require an
+        // explicit value for --flash-attn (on|off|auto). Passing the bare
+        // flag silently swallows the next argument as its value, which
+        // crashes startup with a confusing "unknown value" error.
         let arguments = [
             "-m", modelPath,
             "--host", host,
             "--port", String(port),
             "-c", "1536",
             "-ngl", "99",
-            "--flash-attn",
+            "--flash-attn", "on",
             "--cache-type-k", "q8_0",
             "--cache-type-v", "q8_0",
             "--cache-reuse", "256",
