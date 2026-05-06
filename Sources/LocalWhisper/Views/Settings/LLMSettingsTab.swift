@@ -10,17 +10,32 @@ struct LLMSettingsTab: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Polish transcript with LLM", isOn: $settings.llmRefinementEnabled)
+                Toggle("Refine transcript with LLM", isOn: $settings.llmRefinementEnabled)
                     .disabled(!isReady)
                 if !isReady {
                     Text(readinessHint)
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
+
+                Picker("Style", selection: Binding(
+                    get: { settings.llmRefinementStyle },
+                    set: { settings.llmRefinementStyle = $0 }
+                )) {
+                    Text("Light — fix mechanics").tag(SettingsStore.RefinementStyle.light)
+                    Text("Polish — rewrite as clean message").tag(SettingsStore.RefinementStyle.polish)
+                }
+                .pickerStyle(.radioGroup)
+                .disabled(!isReady || !settings.llmRefinementEnabled)
+
+                Text(styleExplanation)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             } header: {
                 Text("Refinement")
             } footer: {
-                Text("After Whisper transcribes, a small LLM fixes typos, capitalization, and punctuation. The original transcript is used if the LLM is too slow or returns implausible output.")
+                Text("Light preserves your wording and only fixes accents, punctuation, and capitalization. Polish rewrites your dictation as a clean written message in the same language: removes \"cioè / secondo me\", normalizes register, splits run-on sentences. Polish needs ~2-3× more output and is meaningfully slower.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -129,6 +144,15 @@ struct LLMSettingsTab: View {
         .formStyle(.grouped)
         .padding(20)
         .onAppear { reloadModels() }
+    }
+
+    private var styleExplanation: String {
+        switch settings.llmRefinementStyle {
+        case .light:
+            return "Example: \"perche cosi non perdiamo tempo\" → \"Perché così non perdiamo tempo.\""
+        case .polish:
+            return "Example: \"il psg ha segnato dopo due minuti e sono in vantaggio cioè secondo me la pareggiano\" → \"Il PSG ha segnato dopo due minuti ed è in vantaggio. A mio avviso, pareggeranno.\""
+        }
     }
 
     private var isReady: Bool {

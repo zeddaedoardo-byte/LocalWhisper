@@ -469,8 +469,10 @@ final class AppState: ObservableObject {
             // implausible output (see LLMRefinerService.isPlausibleRefinement).
             let transcript: String
             if shouldRefine {
+                let style: LLMRefinerService.Style = settings.llmRefinementStyle == .polish ? .polish : .light
                 transcript = await llmRefiner.refine(
                     rawTranscript,
+                    style: style,
                     serverBinaryPath: settings.llmServerBinaryPath,
                     modelPath: settings.llmModelPath
                 )

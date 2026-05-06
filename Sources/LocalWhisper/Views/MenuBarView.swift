@@ -194,12 +194,31 @@ struct MenuBarView: View {
                 Text("Configure model in Settings → LLM")
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
-            } else if let modelName = currentLlmModelName {
-                Text(modelName)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+            } else {
+                if settings.llmRefinementEnabled {
+                    HStack(spacing: 6) {
+                        Text("Style:")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                        Picker("", selection: Binding(
+                            get: { settings.llmRefinementStyle },
+                            set: { settings.llmRefinementStyle = $0 }
+                        )) {
+                            Text("Light").tag(SettingsStore.RefinementStyle.light)
+                            Text("Polish").tag(SettingsStore.RefinementStyle.polish)
+                        }
+                        .labelsHidden()
+                        .controlSize(.small)
+                        .pickerStyle(.segmented)
+                    }
+                }
+                if let modelName = currentLlmModelName {
+                    Text(modelName)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
             }
         }
     }

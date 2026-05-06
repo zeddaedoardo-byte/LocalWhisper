@@ -21,6 +21,18 @@ final class SettingsStore: ObservableObject {
         static let llmRefinementEnabled = "llmRefinementEnabled"
         static let llmModelPath = "llmModelPath"
         static let llmServerBinaryPath = "llmServerBinaryPath"
+        static let llmRefinementStyle = "llmRefinementStyle"
+    }
+
+    // Two refinement intensities. Light preserves every word and only fixes
+    // mechanical errors (accents, punctuation, capitalization). Polish
+    // rewrites the dictation as a clean written message in the same
+    // language: removes filler ("cioè", "secondo me"), normalizes register,
+    // fixes grammar agreement, splits run-on sentences. Diff-guard limits
+    // are different per style.
+    enum RefinementStyle: String, CaseIterable {
+        case light
+        case polish
     }
 
     private let defaults: UserDefaults
@@ -108,6 +120,15 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(llmServerBinaryPath, forKey: Keys.llmServerBinaryPath) }
     }
 
+    @Published var llmRefinementStyleRaw: String {
+        didSet { defaults.set(llmRefinementStyleRaw, forKey: Keys.llmRefinementStyle) }
+    }
+
+    var llmRefinementStyle: RefinementStyle {
+        get { RefinementStyle(rawValue: llmRefinementStyleRaw) ?? .light }
+        set { llmRefinementStyleRaw = newValue.rawValue }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
@@ -162,6 +183,8 @@ final class SettingsStore: ObservableObject {
         } else {
             self.llmServerBinaryPath = SettingsStore.defaultLlamaServerBinaryPath()
         }
+        self.llmRefinementStyleRaw = defaults.string(forKey: Keys.llmRefinementStyle)
+            ?? RefinementStyle.light.rawValue
 
         let didSuggest = defaults.bool(forKey: Keys.didSuggestPreset)
         let storedPreset = defaults.string(forKey: Keys.performancePreset)
