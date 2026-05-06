@@ -35,6 +35,8 @@ final class AppState: ObservableObject {
     private var modelSettingCancellable: AnyCancellable?
     private var soundSettingCancellable: AnyCancellable?
     private var launchSettingCancellable: AnyCancellable?
+    private var llmEnabledCancellable: AnyCancellable?
+    private var retroactivePolishTask: Task<Void, Never>?
     private var accessibilityPollTimer: Timer?
 
     init(settings: SettingsStore) {
@@ -51,6 +53,7 @@ final class AppState: ObservableObject {
         observeModelSetting()
         observeSoundSetting()
         observeLaunchSetting()
+        observeLlmEnabledSetting()
         refreshAccessibilityStatus()
         startPushToTalk()
         scheduleWarmup()
@@ -353,6 +356,62 @@ final class AppState: ObservableObject {
             }
     }
 
+    // When the user flips the LLM toggle from OFF to ON and there is
+    // already a recent transcript sitting in `lastTranscript` / clipboard,
+    // run polish on it retroactively. This lets the user dictate first,
+    // re-read, and only then decide they want a polished version — no need
+    // to re-record the whole sentence.
+    private func observeLlmEnabledSetting() {
+        llmEnabledCancellable = settings.$llmRefinementEnabled
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] enabled in
+                guard enabled else { return }
+                self?.polishLastTranscriptIfPossible()
+            }
+    }
+
+    private func polishLastTranscriptIfPossible() {
+        guard shouldRefine else { return }
+        let original = lastTranscript
+        guard !original.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        // Don't fight an in-flight transcription; that path will refine
+        // its own output through the normal pipeline.
+        guard status != .recording, status != .transcribing else { return }
+
+        retroactivePolishTask?.cancel()
+        retroactivePolishTask = Task { [weak self] in
+            guard let self else { return }
+            let savedStatus = self.status
+            self.status = .transcribing
+            self.hudController.update(state: .transcribing)
+
+            let polished = await self.llmRefiner.refine(
+                original,
+                style: .polish,
+                serverBinaryPath: self.settings.llmServerBinaryPath,
+                modelPath: self.settings.llmModelPath
+            )
+
+            // Only commit the polished result if it changed; otherwise
+            // silently restore the previous status.
+            if polished != original {
+                self.lastTranscript = polished
+                self.clipboardService.copy(polished)
+                self.status = .completed
+                self.hudController.update(state: .completed(Self.previewSnippet(polished)))
+            } else {
+                self.status = savedStatus
+                self.hudController.update(state: .hidden)
+            }
+        }
+    }
+
+    private static func previewSnippet(_ text: String) -> String {
+        let prefix = text.prefix(72)
+        return prefix.count < text.count ? String(prefix) + "…" : String(prefix)
+    }
+
     private func applyLaunchAtLoginSetting() {
         let desired = settings.launchAtLogin
         let actual = LoginItemService.shared.setEnabled(desired)
@@ -467,12 +526,12 @@ final class AppState: ObservableObject {
             // Optional refinement: never blocks or fails the pipeline. The
             // refiner returns the original on any timeout, error, or
             // implausible output (see LLMRefinerService.isPlausibleRefinement).
+            // Always uses Polish style — the toggle is the only knob.
             let transcript: String
             if shouldRefine {
-                let style: LLMRefinerService.Style = settings.llmRefinementStyle == .polish ? .polish : .light
                 transcript = await llmRefiner.refine(
                     rawTranscript,
-                    style: style,
+                    style: .polish,
                     serverBinaryPath: settings.llmServerBinaryPath,
                     modelPath: settings.llmModelPath
                 )

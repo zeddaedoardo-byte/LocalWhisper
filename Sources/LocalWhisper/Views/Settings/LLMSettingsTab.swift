@@ -10,32 +10,17 @@ struct LLMSettingsTab: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Refine transcript with LLM", isOn: $settings.llmRefinementEnabled)
+                Toggle("Polish transcript with LLM", isOn: $settings.llmRefinementEnabled)
                     .disabled(!isReady)
                 if !isReady {
                     Text(readinessHint)
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
-
-                Picker("Style", selection: Binding(
-                    get: { settings.llmRefinementStyle },
-                    set: { settings.llmRefinementStyle = $0 }
-                )) {
-                    Text("Light — fix mechanics").tag(SettingsStore.RefinementStyle.light)
-                    Text("Polish — rewrite as clean message").tag(SettingsStore.RefinementStyle.polish)
-                }
-                .pickerStyle(.radioGroup)
-                .disabled(!isReady || !settings.llmRefinementEnabled)
-
-                Text(styleExplanation)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             } header: {
                 Text("Refinement")
             } footer: {
-                Text("Light preserves your wording and only fixes accents, punctuation, and capitalization. Polish rewrites your dictation as a clean written message in the same language: removes \"cioè / secondo me\", normalizes register, splits run-on sentences. Polish needs ~2-3× more output and is meaningfully slower.")
+                Text("After Whisper transcribes, the LLM rewrites your dictation as a polished written message in the same language: removes filler (\"cioè\", \"secondo me\", \"tipo\"), normalizes register, fixes grammar, splits run-on sentences. Latency depends on the model — pick a small one for live chat, a larger one for important messages.\n\nIf you toggle this on AFTER a dictation is already in your clipboard, the previous transcript is automatically polished and the clipboard is updated.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -144,15 +129,6 @@ struct LLMSettingsTab: View {
         .formStyle(.grouped)
         .padding(20)
         .onAppear { reloadModels() }
-    }
-
-    private var styleExplanation: String {
-        switch settings.llmRefinementStyle {
-        case .light:
-            return "Example: \"perche cosi non perdiamo tempo\" → \"Perché così non perdiamo tempo.\""
-        case .polish:
-            return "Example: \"il psg ha segnato dopo due minuti e sono in vantaggio cioè secondo me la pareggiano\" → \"Il PSG ha segnato dopo due minuti ed è in vantaggio. A mio avviso, pareggeranno.\""
-        }
     }
 
     private var isReady: Bool {
