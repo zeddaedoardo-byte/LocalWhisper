@@ -243,33 +243,45 @@ enum LLMModelCatalog {
         let url: String
     }
 
+    // Ordered fastest -> highest quality. Latency hints are for a warm
+    // process with cached system prompt and ~50 token output, on a base
+    // M3 Air. M2 Air is ~30% slower; M4 Air is ~20% faster.
     static let recommended: [Recommended] = [
-        Recommended(
-            name: "Qwen 3 0.6B",
-            size: "378 MB",
-            latencyHint: "~300ms",
-            fitsBudget: false,
-            note: "Latest small Qwen. Best quality/speed balance. Slightly above 200ms budget but very capable for cleanup. 100+ languages.",
-            filename: "Qwen3-0.6B-Q4_K_M.gguf",
-            url: "https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf"
-        ),
         Recommended(
             name: "Gemma 3 270M Instruct",
             size: "~200 MB",
-            latencyHint: "~200ms",
+            latencyHint: "~200 ms",
             fitsBudget: true,
-            note: "Smallest Gemma. Borderline budget, decent quality. Multilingual.",
+            note: "Speed champion. Multilingual (256K vocab efficient on Italian). Fits the latency budget. Quality OK for trivial fixes.",
             filename: "Gemma-3-270m-it-Q4_K_M.gguf",
             url: "https://huggingface.co/unsloth/gemma-3-270m-it-GGUF/resolve/main/gemma-3-270m-it-Q4_K_M.gguf"
         ),
         Recommended(
+            name: "Qwen 3 0.6B",
+            size: "378 MB",
+            latencyHint: "~400 ms",
+            fitsBudget: false,
+            note: "Latest small Qwen. Strong instruction following. Italian tokenizer ~15% less efficient than Gemma.",
+            filename: "Qwen3-0.6B-Q4_K_M.gguf",
+            url: "https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf"
+        ),
+        Recommended(
             name: "Gemma 3 1B Instruct",
             size: "~750 MB",
-            latencyHint: "~600ms",
+            latencyHint: "~1 s",
             fitsBudget: false,
-            note: "Larger Gemma 3. Higher quality but visibly laggy paste.",
+            note: "Same Gemma 3 multilingual training as 4B in a smaller package. Solid quality/speed balance.",
             filename: "Gemma-3-1b-it-Q4_K_M.gguf",
             url: "https://huggingface.co/unsloth/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q4_K_M.gguf"
+        ),
+        Recommended(
+            name: "Gemma 3 4B Instruct (Quality)",
+            size: "2.49 GB",
+            latencyHint: "~2-3 s",
+            fitsBudget: false,
+            note: "Quality champion for Italian. Best non-fine-tuned small model on Evalita-LLM CLiC-it 2025. Use when accuracy matters more than paste latency.",
+            filename: "gemma-3-4b-it-Q4_K_M.gguf",
+            url: "https://huggingface.co/unsloth/gemma-3-4b-it-GGUF/resolve/main/gemma-3-4b-it-Q4_K_M.gguf"
         )
     ]
 }

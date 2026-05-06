@@ -448,7 +448,7 @@ final class AppState: ObservableObject {
             hudController.update(state: .transcribing)
             startEscapeMonitor()
 
-            let rawTranscript = try await whisperService.transcribe(
+            let whisperOutput = try await whisperService.transcribe(
                 audioURL: audioURL,
                 binaryPath: settings.whisperBinaryPath,
                 modelPath: settings.modelPath,
@@ -457,6 +457,12 @@ final class AppState: ObservableObject {
                 prompt: settings.initialPrompt
             )
             transcribeSucceeded = true
+
+            // Deterministic Italian diacritic restoration: microsecond-fast,
+            // safe on any language (no English word matches the entries),
+            // catches the most common Whisper-Turbo misses (perché, così,
+            // più, già, può, città, …) before the LLM call.
+            let rawTranscript = ItalianDiacriticFixer.fix(whisperOutput)
 
             // Optional refinement: never blocks or fails the pipeline. The
             // refiner returns the original on any timeout, error, or
