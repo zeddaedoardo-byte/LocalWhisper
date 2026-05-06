@@ -299,13 +299,22 @@ enum LLMModelCatalog {
             url: "https://huggingface.co/unsloth/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q4_K_M.gguf"
         ),
         Recommended(
-            name: "Gemma 3 4B Instruct (Quality)",
+            name: "Gemma 3 4B Instruct",
             size: "2.49 GB",
             latencyHint: "~2-3 s",
             fitsBudget: false,
-            note: "Quality champion for Italian. Best non-fine-tuned small model on Evalita-LLM CLiC-it 2025. Use when accuracy matters more than paste latency.",
+            note: "Best non-fine-tuned small model on Italian (Evalita-LLM CLiC-it 2025). Mature, well-tested.",
             filename: "gemma-3-4b-it-Q4_K_M.gguf",
             url: "https://huggingface.co/unsloth/gemma-3-4b-it-GGUF/resolve/main/gemma-3-4b-it-Q4_K_M.gguf"
+        ),
+        Recommended(
+            name: "Gemma 4 E2B Instruct (Latest)",
+            size: "3.11 GB",
+            latencyHint: "~2-4 s",
+            fitsBudget: false,
+            note: "Newest Gemma. Effective 2.3B params via MatFormer architecture. Apr 2026 release. Same multilingual training as Gemma 3 plus reasoning mode and doubled context. Quality leader for polish-grade rewrites.",
+            filename: "gemma-4-E2B-it-Q4_K_M.gguf",
+            url: "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf"
         )
     ]
 }
