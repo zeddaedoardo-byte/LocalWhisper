@@ -17,6 +17,7 @@ final class AppState: ObservableObject {
     private let settings: SettingsStore
     private let audioRecorder = AudioRecorderService()
     private let whisperService = WhisperService()
+    private let llmRefiner = LLMRefinerService()
     private let clipboardService = ClipboardService()
     private let pasteService = PasteService()
     private let pushToTalkService = PushToTalkService()
@@ -224,6 +225,7 @@ final class AppState: ObservableObject {
         accessibilityPollTimer = nil
         pushToTalkService.stop()
         await whisperService.shutdown()
+        await llmRefiner.shutdown()
     }
 
     func showOnboardingIfNeeded() {
@@ -446,18 +448,35 @@ final class AppState: ObservableObject {
             hudController.update(state: .transcribing)
             startEscapeMonitor()
 
-            let transcript = try await whisperService.transcribe(
+            let rawTranscript = try await whisperService.transcribe(
                 audioURL: audioURL,
                 binaryPath: settings.whisperBinaryPath,
                 modelPath: settings.modelPath,
                 language: settings.language,
-                params: currentDecodingParams
+                params: currentDecodingParams,
+                prompt: settings.initialPrompt
             )
             transcribeSucceeded = true
 
+            // Optional refinement: never blocks or fails the pipeline. The
+            // refiner returns the original on any timeout, error, or
+            // implausible output (see LLMRefinerService.isPlausibleRefinement).
+            let transcript: String
+            if shouldRefine {
+                transcript = await llmRefiner.refine(
+                    rawTranscript,
+                    serverBinaryPath: settings.llmServerBinaryPath,
+                    modelPath: settings.llmModelPath
+                )
+            } else {
+                transcript = rawTranscript
+            }
+
             lastTranscript = transcript
             clipboardService.copy(transcript)
-            accumulateTimeSaved(transcript: transcript, audioURL: audioURL)
+            // Stats use the original word count and audio duration so toggling
+            // refinement on/off doesn't double-count or skew the metric.
+            accumulateTimeSaved(transcript: rawTranscript, audioURL: audioURL)
 
             var pasteWarning: String?
             if settings.autoPaste {
@@ -497,6 +516,22 @@ final class AppState: ObservableObject {
         lastError = message
         status = .failed(message)
         hudController.update(state: .error(message))
+    }
+
+    // Refinement runs only when the user toggled it on AND a model + server
+    // binary are configured. We surface configuration errors via lastError
+    // so the menu bar can show them, but never throw or block the pipeline.
+    private var shouldRefine: Bool {
+        guard settings.llmRefinementEnabled else { return false }
+        guard !settings.llmModelPath.isEmpty,
+              FileManager.default.fileExists(atPath: settings.llmModelPath) else {
+            return false
+        }
+        guard !settings.llmServerBinaryPath.isEmpty,
+              FileManager.default.isExecutableFile(atPath: settings.llmServerBinaryPath) else {
+            return false
+        }
+        return true
     }
 
     private func accumulateTimeSaved(transcript: String, audioURL: URL) {

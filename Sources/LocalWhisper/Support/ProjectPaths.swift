@@ -33,6 +33,12 @@ enum ProjectPaths {
         applicationSupportRoot.appendingPathComponent("Models", isDirectory: true)
     }
 
+    // GGUF models for the optional LLM refinement layer (SmolLM2, Qwen, etc.).
+    // The user drops files here; the menu bar picker enumerates them.
+    static var llmModelsDir: URL {
+        applicationSupportRoot.appendingPathComponent("LLMModels", isDirectory: true)
+    }
+
     static var defaultModelURL: URL {
         let asURL = applicationSupportModelsDir.appendingPathComponent("ggml-large-v3.bin")
         if FileManager.default.fileExists(atPath: asURL.path) {

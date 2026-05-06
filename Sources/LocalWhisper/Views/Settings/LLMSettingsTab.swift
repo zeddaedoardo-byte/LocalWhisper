@@ -1,0 +1,275 @@
+import AppKit
+import SwiftUI
+
+struct LLMSettingsTab: View {
+    @EnvironmentObject private var settings: SettingsStore
+    @State private var availableModels: [LLMModelEntry] = []
+    @State private var downloading: String? = nil
+    @State private var downloadError: String? = nil
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Polish transcript with LLM", isOn: $settings.llmRefinementEnabled)
+                    .disabled(!isReady)
+                if !isReady {
+                    Text(readinessHint)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            } header: {
+                Text("Refinement")
+            } footer: {
+                Text("After Whisper transcribes, a small LLM fixes typos, capitalization, and punctuation. The original transcript is used if the LLM is too slow or returns implausible output.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                if availableModels.isEmpty {
+                    Text("No GGUF models found yet.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    Picker("Model", selection: $settings.llmModelPath) {
+                        Text("None").tag("")
+                        ForEach(availableModels, id: \.path) { model in
+                            Text(model.displayName).tag(model.path)
+                        }
+                    }
+                }
+
+                LabeledContent("Models folder") {
+                    Text(ProjectPaths.llmModelsDir.path)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .lineLimit(2)
+                        .truncationMode(.middle)
+                }
+
+                HStack {
+                    Button("Open folder") { openModelsFolder() }
+                    Button("Refresh list") { reloadModels() }
+                    Spacer()
+                    Button("Browse for GGUF…") { browseForModel() }
+                }
+            } header: {
+                Text("Selected model")
+            }
+
+            Section {
+                ForEach(LLMModelCatalog.recommended) { model in
+                    HStack(alignment: .top, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 6) {
+                                Text(model.name)
+                                    .fontWeight(.medium)
+                                Text(model.size)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Text("•")
+                                    .foregroundStyle(.secondary)
+                                Text(model.latencyHint)
+                                    .font(.caption)
+                                    .foregroundStyle(model.fitsBudget ? .green : .orange)
+                            }
+                            Text(model.note)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer()
+                        if isInstalled(model) {
+                            Text("Installed")
+                                .font(.caption)
+                                .foregroundStyle(.green)
+                        } else if downloading == model.filename {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Button("Download") {
+                                Task { await download(model) }
+                            }
+                            .controlSize(.small)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                if let downloadError {
+                    Text(downloadError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            } header: {
+                Text("Recommended models")
+            } footer: {
+                Text("Latency target is 100-200ms per dictation. Smaller models hit it; larger ones have higher quality but add noticeable lag. All models work fully offline once downloaded.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                LabeledContent("Binary") {
+                    Text(settings.llmServerBinaryPath.isEmpty ? "Not found" : settings.llmServerBinaryPath)
+                        .foregroundStyle(settings.llmServerBinaryPath.isEmpty ? .red : .secondary)
+                        .textSelection(.enabled)
+                        .lineLimit(2)
+                        .truncationMode(.middle)
+                }
+                if settings.llmServerBinaryPath.isEmpty {
+                    Text("Install with: brew install llama.cpp")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospaced()
+                }
+                Button("Browse for llama-server…") { browseForBinary() }
+            } header: {
+                Text("llama-server")
+            }
+        }
+        .formStyle(.grouped)
+        .padding(20)
+        .onAppear { reloadModels() }
+    }
+
+    private var isReady: Bool {
+        !settings.llmServerBinaryPath.isEmpty &&
+        FileManager.default.isExecutableFile(atPath: settings.llmServerBinaryPath) &&
+        !settings.llmModelPath.isEmpty &&
+        FileManager.default.fileExists(atPath: settings.llmModelPath)
+    }
+
+    private var readinessHint: String {
+        if settings.llmServerBinaryPath.isEmpty {
+            return "llama-server binary missing."
+        }
+        if settings.llmModelPath.isEmpty {
+            return "Pick a model below or download one."
+        }
+        return ""
+    }
+
+    private func reloadModels() {
+        let dir = ProjectPaths.llmModelsDir
+        let fm = FileManager.default
+        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        guard let urls = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else {
+            availableModels = []
+            return
+        }
+        availableModels = urls
+            .filter { $0.pathExtension.lowercased() == "gguf" }
+            .map { LLMModelEntry(path: $0.path, displayName: $0.deletingPathExtension().lastPathComponent) }
+            .sorted { $0.displayName < $1.displayName }
+    }
+
+    private func openModelsFolder() {
+        let dir = ProjectPaths.llmModelsDir
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(dir)
+    }
+
+    private func browseForModel() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.init(filenameExtension: "gguf") ?? .data]
+        panel.allowsMultipleSelection = false
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        if panel.runModal() == .OK, let url = panel.url {
+            settings.llmModelPath = url.path
+            reloadModels()
+        }
+    }
+
+    private func browseForBinary() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        if panel.runModal() == .OK, let url = panel.url {
+            settings.llmServerBinaryPath = url.path
+        }
+    }
+
+    private func isInstalled(_ model: LLMModelCatalog.Recommended) -> Bool {
+        let target = ProjectPaths.llmModelsDir.appendingPathComponent(model.filename)
+        return FileManager.default.fileExists(atPath: target.path)
+    }
+
+    private func download(_ model: LLMModelCatalog.Recommended) async {
+        downloadError = nil
+        downloading = model.filename
+        defer { downloading = nil }
+
+        let dir = ProjectPaths.llmModelsDir
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let dest = dir.appendingPathComponent(model.filename)
+
+        do {
+            guard let url = URL(string: model.url) else {
+                throw URLError(.badURL)
+            }
+            var request = URLRequest(url: url)
+            // HuggingFace serves some repos behind UA-checked CDN; a real
+            // browser UA is enough to avoid spurious 401s.
+            request.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
+            let (tmpURL, response) = try await URLSession.shared.download(for: request)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                throw URLError(.badServerResponse)
+            }
+            try? FileManager.default.removeItem(at: dest)
+            try FileManager.default.moveItem(at: tmpURL, to: dest)
+            settings.llmModelPath = dest.path
+            reloadModels()
+        } catch {
+            downloadError = "Download failed: \(error.localizedDescription)"
+        }
+    }
+}
+
+struct LLMModelEntry: Hashable {
+    let path: String
+    let displayName: String
+}
+
+enum LLMModelCatalog {
+    struct Recommended: Identifiable {
+        let id = UUID()
+        let name: String
+        let size: String
+        let latencyHint: String
+        let fitsBudget: Bool
+        let note: String
+        let filename: String
+        let url: String
+    }
+
+    static let recommended: [Recommended] = [
+        Recommended(
+            name: "Qwen 3 0.6B",
+            size: "378 MB",
+            latencyHint: "~300ms",
+            fitsBudget: false,
+            note: "Latest small Qwen. Best quality/speed balance. Slightly above 200ms budget but very capable for cleanup. 100+ languages.",
+            filename: "Qwen3-0.6B-Q4_K_M.gguf",
+            url: "https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf"
+        ),
+        Recommended(
+            name: "Gemma 3 270M Instruct",
+            size: "~200 MB",
+            latencyHint: "~200ms",
+            fitsBudget: true,
+            note: "Smallest Gemma. Borderline budget, decent quality. Multilingual.",
+            filename: "Gemma-3-270m-it-Q4_K_M.gguf",
+            url: "https://huggingface.co/unsloth/gemma-3-270m-it-GGUF/resolve/main/gemma-3-270m-it-Q4_K_M.gguf"
+        ),
+        Recommended(
+            name: "Gemma 3 1B Instruct",
+            size: "~750 MB",
+            latencyHint: "~600ms",
+            fitsBudget: false,
+            note: "Larger Gemma 3. Higher quality but visibly laggy paste.",
+            filename: "Gemma-3-1b-it-Q4_K_M.gguf",
+            url: "https://huggingface.co/unsloth/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q4_K_M.gguf"
+        )
+    ]
+}

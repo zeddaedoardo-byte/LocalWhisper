@@ -37,11 +37,12 @@ final class WhisperService {
         binaryPath: String,
         modelPath: String,
         language: String,
-        params: WhisperServerWorker.DecodingParams
+        params: WhisperServerWorker.DecodingParams,
+        prompt: String = ""
     ) async throws -> String {
         let serverPath = Self.serverBinary(forCLIPath: binaryPath)
         try await worker.ensureRunning(serverBinaryPath: serverPath, modelPath: modelPath, params: params)
-        return try await worker.transcribe(audioURL: audioURL, language: language)
+        return try await worker.transcribe(audioURL: audioURL, language: language, prompt: prompt)
     }
 
     func shutdown() async {
