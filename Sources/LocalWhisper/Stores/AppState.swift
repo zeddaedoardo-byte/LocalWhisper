@@ -23,8 +23,18 @@ final class AppState: ObservableObject {
     private let pasteService = PasteService()
     private let pushToTalkService = PushToTalkService()
     private let escapeMonitor = EscapeKeyMonitor()
+    private let silenceWatchdog = SilenceWatchdog()
     private var isPushToTalkHeld = false
     private var isStartingPushToTalkRecording = false
+    private enum PTTMode { case idle, hold, continuous }
+    private var pttMode: PTTMode = .idle
+    private var lockTriggerSettingCancellable: AnyCancellable?
+    /// True while a continuous-mode start is awaiting `startRecording()`.
+    /// A second lock press during this window flips
+    /// `continuousStartCancelled` so the post-start code discards the
+    /// recording instead of entering continuous mode.
+    private var continuousStartInFlight = false
+    private var continuousStartCancelled = false
     private var warmupTask: Task<Void, Never>?
     private var transcribeTask: Task<Void, Never>?
     private var lastAudioURL: URL?
@@ -44,6 +54,7 @@ final class AppState: ObservableObject {
         self.settings = settings
         audioRecorder.preferredDeviceUID = settings.preferredMicUID.isEmpty ? nil : settings.preferredMicUID
         PushToTalkService.setTrigger(AppState.resolveTrigger(settings))
+        PushToTalkService.setLockTrigger(AppState.resolveLockTrigger(settings))
         SoundService.shared.isEnabled = settings.playSounds
         applyLaunchAtLoginSetting()
         showOnboardingIfNeeded()
@@ -77,42 +88,151 @@ final class AppState: ObservableObject {
 
     func startPushToTalk() {
         do {
-            try pushToTalkService.start { [weak self] in
-                Task { @MainActor in
-                    self?.beginPushToTalkRecording()
+            try pushToTalkService.start(
+                onPress: { [weak self] in
+                    Task { @MainActor in
+                        self?.beginPushToTalkRecording()
+                    }
+                },
+                onRelease: { [weak self] in
+                    Task { @MainActor in
+                        self?.endPushToTalkRecording()
+                    }
+                },
+                onLockToggle: { [weak self] in
+                    Task { @MainActor in
+                        self?.toggleContinuousLock()
+                    }
                 }
-            } onRelease: { [weak self] in
-                Task { @MainActor in
-                    self?.endPushToTalkRecording()
-                }
-            }
+            )
         } catch {
             lastError = error.localizedDescription
         }
     }
 
     private func beginPushToTalkRecording() {
+        // While in continuous, the primary trigger acts as an explicit
+        // stop. This is the user's escape hatch when the silence watchdog
+        // doesn't trigger (noisy environment) or when they got into
+        // continuous unintentionally via the lock combo.
+        if pttMode == .continuous {
+            stopContinuousAndTranscribe()
+            return
+        }
+
         guard status != .recording,
               status.canToggleRecording,
               !isStartingPushToTalkRecording else { return }
 
         isPushToTalkHeld = true
         isStartingPushToTalkRecording = true
+        pttMode = .hold
 
         Task { @MainActor in
             await startRecording()
             isStartingPushToTalkRecording = false
 
-            if !isPushToTalkHeld, status == .recording {
+            if !isPushToTalkHeld, status == .recording, pttMode == .hold {
+                pttMode = .idle
                 await stopAndTranscribe()
             }
         }
     }
 
     private func endPushToTalkRecording() {
+        // In continuous mode the physical release of the primary trigger is
+        // irrelevant — the session ends on silence or on another lock press.
+        if pttMode == .continuous { return }
+
         guard isPushToTalkHeld else { return }
         isPushToTalkHeld = false
 
+        if status == .recording {
+            pttMode = .idle
+            transcribeTask?.cancel()
+            transcribeTask = Task { [weak self] in
+                await self?.stopAndTranscribe()
+            }
+        }
+    }
+
+    /// Toggle entry point for the secondary "lock-in" hotkey. Starts a
+    /// continuous (hands-free) recording, or stops one in progress.
+    private func toggleContinuousLock() {
+        if pttMode == .continuous {
+            stopContinuousAndTranscribe()
+            return
+        }
+
+        // Second tap arriving while we are still spinning up the audio
+        // engine for a previous lock press. Flag the in-flight start as
+        // cancelled — the async tail will discard the recording instead
+        // of entering continuous mode.
+        if continuousStartInFlight {
+            continuousStartCancelled = true
+            return
+        }
+
+        // Promote an active hold session into continuous without restarting
+        // the audio stream — user pressed-and-held the primary trigger,
+        // then tapped the lock combo to "lock in" before releasing.
+        if status == .recording {
+            isPushToTalkHeld = false
+            enterContinuousMode()
+            return
+        }
+
+        // Fresh start.
+        guard status.canToggleRecording, !isStartingPushToTalkRecording else { return }
+        isStartingPushToTalkRecording = true
+        continuousStartInFlight = true
+        continuousStartCancelled = false
+        Task { @MainActor in
+            await startRecording()
+            isStartingPushToTalkRecording = false
+            continuousStartInFlight = false
+
+            if continuousStartCancelled {
+                continuousStartCancelled = false
+                discardActiveRecording()
+                return
+            }
+            if status == .recording {
+                enterContinuousMode()
+            }
+        }
+    }
+
+    /// Stops and discards an in-progress recording without going through
+    /// the transcribe pipeline. Used when the user cancels a continuous
+    /// start mid-spinup.
+    private func discardActiveRecording() {
+        guard status == .recording else { return }
+        if let url = try? audioRecorder.stopRecording() {
+            try? FileManager.default.removeItem(at: url)
+        }
+        pttMode = .idle
+        status = .idle
+        lastError = nil
+        hudController.update(state: .hidden)
+        stopEscapeMonitor()
+    }
+
+    private func enterContinuousMode() {
+        pttMode = .continuous
+        hudController.setContinuous(true)
+        silenceWatchdog.start(
+            level: audioRecorder.$levelDB.eraseToAnyPublisher()
+        ) { [weak self] in
+            self?.stopContinuousAndTranscribe()
+        }
+    }
+
+    private func stopContinuousAndTranscribe() {
+        silenceWatchdog.stop()
+        hudController.setContinuous(false)
+        guard pttMode == .continuous else { return }
+        pttMode = .idle
         if status == .recording {
             transcribeTask?.cancel()
             transcribeTask = Task { [weak self] in
@@ -130,6 +250,9 @@ final class AppState: ObservableObject {
         if status == .recording {
             isPushToTalkHeld = false
             isStartingPushToTalkRecording = false
+            silenceWatchdog.stop()
+            hudController.setContinuous(false)
+            pttMode = .idle
             if let url = try? audioRecorder.stopRecording() {
                 try? FileManager.default.removeItem(at: url)
             }
@@ -172,6 +295,9 @@ final class AppState: ObservableObject {
 
     func resetPushToTalk() {
         pushToTalkService.stop()
+        silenceWatchdog.stop()
+        pttMode = .idle
+        hudController.setContinuous(false)
         startPushToTalk()
         refreshAccessibilityStatus()
     }
@@ -227,6 +353,7 @@ final class AppState: ObservableObject {
         warmupTask?.cancel()
         accessibilityPollTimer?.invalidate()
         accessibilityPollTimer = nil
+        silenceWatchdog.stop()
         pushToTalkService.stop()
         await whisperService.shutdown()
         await llmRefiner.shutdown()
@@ -461,6 +588,18 @@ final class AppState: ObservableObject {
         )
         .receive(on: RunLoop.main)
         .sink { _ in updateTrigger() }
+
+        let updateLockTrigger: () -> Void = { [weak self] in
+            guard let self else { return }
+            PushToTalkService.setLockTrigger(AppState.resolveLockTrigger(self.settings))
+        }
+        lockTriggerSettingCancellable = Publishers.MergeMany(
+            settings.$lockTriggerID.map { _ in () }.eraseToAnyPublisher(),
+            settings.$customLockTriggerKeycode.map { _ in () }.eraseToAnyPublisher(),
+            settings.$customLockTriggerFlags.map { _ in () }.eraseToAnyPublisher()
+        )
+        .receive(on: RunLoop.main)
+        .sink { _ in updateLockTrigger() }
     }
 
     static func resolveTrigger(_ settings: SettingsStore) -> PushToTalkTrigger {
@@ -479,6 +618,34 @@ final class AppState: ObservableObject {
             )
         }
         return PushToTalkTrigger.byID(settings.pushToTalkTriggerID)
+    }
+
+    static func resolveLockTrigger(_ settings: SettingsStore) -> PushToTalkTrigger? {
+        let id = settings.lockTriggerID
+        if id.isEmpty { return nil }
+        if id == "custom" {
+            // Custom slot configured but with no usable data — treat as
+            // disabled rather than silently falling back to a preset.
+            guard settings.customLockTriggerKeycode >= 0,
+                  settings.customLockTriggerFlags != 0 else {
+                return nil
+            }
+            let label = settings.customLockTriggerLabel.isEmpty
+                ? PushToTalkTrigger.describe(keycode: settings.customLockTriggerKeycode,
+                                             flags: settings.customLockTriggerFlags)
+                : settings.customLockTriggerLabel
+            return PushToTalkTrigger.make(
+                id: "lock_custom",
+                label: label,
+                keycode: settings.customLockTriggerKeycode,
+                flags: settings.customLockTriggerFlags
+            )
+        }
+        // Match by exact ID against known presets. We deliberately avoid
+        // `PushToTalkTrigger.byID` here because its `.fn` fallback would
+        // silently turn a malformed/version-skewed lockTriggerID into a
+        // hidden global hotkey on the fn key.
+        return PushToTalkTrigger.all.first { $0.id == id }
     }
 
     private func startAccessibilityPolling() {

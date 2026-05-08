@@ -1,11 +1,11 @@
 # PLAN.md - LocalWhisper
 
 ## Stato Corrente
-*Aggiornato: 2026-05-02*
+*Aggiornato: 2026-05-08*
 
-**Cosa e attivo ora:** MVP funzionante end-to-end. App menu bar locale, whisper-server persistente con Metal + Accelerate, modello Large V3 in `~/Library/Application Support/LocalWhisper/Models`, Control hold push-to-talk, auto-paste opzionale.
-**Blocchi:** test di registrazione microfono dal vivo richiede interazione utente e permessi (Microphone + Accessibility).
-**Prossima cosa da fare:** verifica live record/paste in chat reale, poi feedback visivo su warmup/registrazione e gestione errori UX.
+**Cosa e attivo ora:** MVP funzionante end-to-end + LLM polish + diacritic fix italiano + **modalita continuous via secondo hotkey configurabile (lock-in combo)** (auto-stop dopo ≥2s di silenzio o nuovo tap del combo).
+**Blocchi:** test live in chat reale; lock combo default OFF, va settato dall'utente in HotkeySettingsTab.
+**Prossima cosa da fare:** verifica live del lock combo → continuous → silence stop su Mac reale, poi rilascio v0.4.0.
 
 ---
 

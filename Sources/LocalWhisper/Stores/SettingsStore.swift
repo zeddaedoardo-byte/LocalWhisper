@@ -11,6 +11,10 @@ final class SettingsStore: ObservableObject {
         static let customTriggerKeycode = "customTriggerKeycode"
         static let customTriggerFlags = "customTriggerFlags"
         static let customTriggerLabel = "customTriggerLabel"
+        static let lockTriggerID = "lockTriggerID"
+        static let customLockTriggerKeycode = "customLockTriggerKeycode"
+        static let customLockTriggerFlags = "customLockTriggerFlags"
+        static let customLockTriggerLabel = "customLockTriggerLabel"
         static let performancePreset = "performancePreset"
         static let didSuggestPreset = "didSuggestPreset"
         static let launchAtLogin = "launchAtLogin"
@@ -65,6 +69,24 @@ final class SettingsStore: ObservableObject {
 
     @Published var customTriggerLabel: String {
         didSet { defaults.set(customTriggerLabel, forKey: Keys.customTriggerLabel) }
+    }
+
+    /// ID of the secondary "lock-in" hotkey that toggles continuous
+    /// recording mode. Empty string disables it.
+    @Published var lockTriggerID: String {
+        didSet { defaults.set(lockTriggerID, forKey: Keys.lockTriggerID) }
+    }
+
+    @Published var customLockTriggerKeycode: Int {
+        didSet { defaults.set(customLockTriggerKeycode, forKey: Keys.customLockTriggerKeycode) }
+    }
+
+    @Published var customLockTriggerFlags: UInt64 {
+        didSet { defaults.set(String(customLockTriggerFlags), forKey: Keys.customLockTriggerFlags) }
+    }
+
+    @Published var customLockTriggerLabel: String {
+        didSet { defaults.set(customLockTriggerLabel, forKey: Keys.customLockTriggerLabel) }
     }
 
     @Published var performancePresetID: String {
@@ -144,6 +166,10 @@ final class SettingsStore: ObservableObject {
         self.customTriggerKeycode = defaults.object(forKey: Keys.customTriggerKeycode) as? Int ?? -1
         self.customTriggerFlags = (defaults.string(forKey: Keys.customTriggerFlags).flatMap(UInt64.init)) ?? 0
         self.customTriggerLabel = defaults.string(forKey: Keys.customTriggerLabel) ?? ""
+        self.lockTriggerID = defaults.string(forKey: Keys.lockTriggerID) ?? ""
+        self.customLockTriggerKeycode = defaults.object(forKey: Keys.customLockTriggerKeycode) as? Int ?? -1
+        self.customLockTriggerFlags = (defaults.string(forKey: Keys.customLockTriggerFlags).flatMap(UInt64.init)) ?? 0
+        self.customLockTriggerLabel = defaults.string(forKey: Keys.customLockTriggerLabel) ?? ""
 
         self.launchAtLogin = defaults.object(forKey: Keys.launchAtLogin) as? Bool ?? false
         self.playSounds = defaults.object(forKey: Keys.playSounds) as? Bool ?? true

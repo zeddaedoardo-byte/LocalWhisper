@@ -4,7 +4,10 @@ import SwiftUI
 struct HotkeySettingsTab: View {
     @EnvironmentObject private var settings: SettingsStore
 
+    private enum CaptureTarget { case primary, lock }
+
     @State private var capturing = false
+    @State private var captureTarget: CaptureTarget = .primary
     @State private var captureMonitor: Any?
     @State private var captureMask: UInt64 = 0
     @State private var captureKeycode: Int = -1
@@ -31,11 +34,11 @@ struct HotkeySettingsTab: View {
                 }
                 .padding(.vertical, 12)
 
-                Button(capturing ? "Listening… press and release" : "Capture key from keyboard") {
-                    if capturing {
+                Button(primaryCaptureButtonLabel) {
+                    if capturing && captureTarget == .primary {
                         cancelCapture()
                     } else {
-                        startCapture()
+                        startCapture(target: .primary)
                     }
                 }
                 .keyboardShortcut(.defaultAction)
@@ -70,6 +73,65 @@ struct HotkeySettingsTab: View {
                     Text("Custom")
                 }
             }
+
+            Section {
+                Picker("Lock-in hotkey", selection: $settings.lockTriggerID) {
+                    Text("Off").tag("")
+                    ForEach(PushToTalkTrigger.all) { trigger in
+                        Text(trigger.label).tag(trigger.id)
+                    }
+                    if isCustomLockConfigured {
+                        Text("Custom: \(customLockLabel)").tag("custom")
+                    }
+                }
+                .pickerStyle(.menu)
+                .disabled(capturing)
+
+                HStack {
+                    Spacer()
+                    KeyCapView(label: lockActiveLabel, highlight: capturing && captureTarget == .lock)
+                    Spacer()
+                }
+                .padding(.vertical, 12)
+
+                Button(lockCaptureButtonLabel) {
+                    if capturing && captureTarget == .lock {
+                        cancelCapture()
+                    } else {
+                        startCapture(target: .lock)
+                    }
+                }
+
+                Text("Tap this combo while idle (or while holding the primary trigger) to start a hands-free continuous recording. Tap again — or stay silent ~2 seconds — to stop.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("Continuous lock")
+            }
+
+            if isCustomLockConfigured {
+                Section {
+                    HStack {
+                        Text("Current lock hotkey")
+                        Spacer()
+                        Text(customLockLabel)
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        Text(String(format: "Keycode %d, flags 0x%llx",
+                                    settings.customLockTriggerKeycode,
+                                    settings.customLockTriggerFlags))
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Remove custom lock") {
+                            clearCustomLock()
+                        }
+                    }
+                } header: {
+                    Text("Lock custom")
+                }
+            }
         }
         .formStyle(.grouped)
         .padding(20)
@@ -88,7 +150,7 @@ struct HotkeySettingsTab: View {
     }
 
     private var activeLabel: String {
-        if capturing {
+        if capturing && captureTarget == .primary {
             if captureMask != 0 {
                 return PushToTalkTrigger.describe(keycode: captureKeycode, flags: captureMask)
             }
@@ -100,8 +162,50 @@ struct HotkeySettingsTab: View {
         return PushToTalkTrigger.byID(settings.pushToTalkTriggerID).label
     }
 
-    private func startCapture() {
+    private var primaryCaptureButtonLabel: String {
+        capturing && captureTarget == .primary
+            ? "Listening… press and release"
+            : "Capture key from keyboard"
+    }
+
+    private var isCustomLockConfigured: Bool {
+        settings.customLockTriggerKeycode >= 0 && settings.customLockTriggerFlags != 0
+    }
+
+    private var customLockLabel: String {
+        settings.customLockTriggerLabel.isEmpty
+            ? PushToTalkTrigger.describe(keycode: settings.customLockTriggerKeycode,
+                                         flags: settings.customLockTriggerFlags)
+            : settings.customLockTriggerLabel
+    }
+
+    private var lockActiveLabel: String {
+        if capturing && captureTarget == .lock {
+            if captureMask != 0 {
+                return PushToTalkTrigger.describe(keycode: captureKeycode, flags: captureMask)
+            }
+            return "..."
+        }
+        if settings.lockTriggerID.isEmpty {
+            return "Off"
+        }
+        if settings.lockTriggerID == "custom", isCustomLockConfigured {
+            return customLockLabel
+        }
+        return PushToTalkTrigger.byID(settings.lockTriggerID).label
+    }
+
+    private var lockCaptureButtonLabel: String {
+        capturing && captureTarget == .lock
+            ? "Listening… press and release"
+            : "Capture lock combo from keyboard"
+    }
+
+    private func startCapture(target: CaptureTarget) {
+        // If a different capture is already running, swap it cleanly.
+        if capturing { cancelCapture() }
         capturing = true
+        captureTarget = target
         captureMask = 0
         captureKeycode = -1
         let monitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
@@ -135,14 +239,23 @@ struct HotkeySettingsTab: View {
         captureCommitWorkItem = nil
         if let m = captureMonitor { NSEvent.removeMonitor(m) }
         captureMonitor = nil
+        let target = captureTarget
         capturing = false
 
         guard captureMask != 0 else { return }
         let label = PushToTalkTrigger.describe(keycode: captureKeycode, flags: captureMask)
-        settings.customTriggerKeycode = captureKeycode
-        settings.customTriggerFlags = captureMask
-        settings.customTriggerLabel = label
-        settings.pushToTalkTriggerID = "custom"
+        switch target {
+        case .primary:
+            settings.customTriggerKeycode = captureKeycode
+            settings.customTriggerFlags = captureMask
+            settings.customTriggerLabel = label
+            settings.pushToTalkTriggerID = "custom"
+        case .lock:
+            settings.customLockTriggerKeycode = captureKeycode
+            settings.customLockTriggerFlags = captureMask
+            settings.customLockTriggerLabel = label
+            settings.lockTriggerID = "custom"
+        }
     }
 
     private func cancelCapture() {
@@ -160,6 +273,15 @@ struct HotkeySettingsTab: View {
         settings.customTriggerFlags = 0
         settings.customTriggerLabel = ""
         settings.pushToTalkTriggerID = PushToTalkTrigger.fn.id
+    }
+
+    private func clearCustomLock() {
+        settings.customLockTriggerKeycode = -1
+        settings.customLockTriggerFlags = 0
+        settings.customLockTriggerLabel = ""
+        if settings.lockTriggerID == "custom" {
+            settings.lockTriggerID = ""
+        }
     }
 }
 
