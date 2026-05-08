@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installSignalHandlers()
         atexit {
             WhisperServerWorker.terminateAllRunningServers()
+            LLMServerWorker.terminateAllRunningServers()
         }
     }
 
@@ -17,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func installSignalHandlers() {
         let handler: @convention(c) (Int32) -> Void = { signal in
             WhisperServerWorker.terminateAllRunningServers()
+            LLMServerWorker.terminateAllRunningServers()
             Darwin.signal(signal, SIG_DFL)
             raise(signal)
         }

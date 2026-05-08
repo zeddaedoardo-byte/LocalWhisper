@@ -11,12 +11,20 @@ final class SettingsStore: ObservableObject {
         static let customTriggerKeycode = "customTriggerKeycode"
         static let customTriggerFlags = "customTriggerFlags"
         static let customTriggerLabel = "customTriggerLabel"
+        static let lockTriggerID = "lockTriggerID"
+        static let customLockTriggerKeycode = "customLockTriggerKeycode"
+        static let customLockTriggerFlags = "customLockTriggerFlags"
+        static let customLockTriggerLabel = "customLockTriggerLabel"
         static let performancePreset = "performancePreset"
         static let didSuggestPreset = "didSuggestPreset"
         static let launchAtLogin = "launchAtLogin"
         static let playSounds = "playSounds"
         static let hasCompletedOnboarding = "hasCompletedOnboarding"
         static let totalTimeSavedSeconds = "totalTimeSavedSeconds"
+        static let initialPrompt = "initialPrompt"
+        static let llmRefinementEnabled = "llmRefinementEnabled"
+        static let llmModelPath = "llmModelPath"
+        static let llmServerBinaryPath = "llmServerBinaryPath"
     }
 
     private let defaults: UserDefaults
@@ -63,6 +71,24 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(customTriggerLabel, forKey: Keys.customTriggerLabel) }
     }
 
+    /// ID of the secondary "lock-in" hotkey that toggles continuous
+    /// recording mode. Empty string disables it.
+    @Published var lockTriggerID: String {
+        didSet { defaults.set(lockTriggerID, forKey: Keys.lockTriggerID) }
+    }
+
+    @Published var customLockTriggerKeycode: Int {
+        didSet { defaults.set(customLockTriggerKeycode, forKey: Keys.customLockTriggerKeycode) }
+    }
+
+    @Published var customLockTriggerFlags: UInt64 {
+        didSet { defaults.set(String(customLockTriggerFlags), forKey: Keys.customLockTriggerFlags) }
+    }
+
+    @Published var customLockTriggerLabel: String {
+        didSet { defaults.set(customLockTriggerLabel, forKey: Keys.customLockTriggerLabel) }
+    }
+
     @Published var performancePresetID: String {
         didSet { defaults.set(performancePresetID, forKey: Keys.performancePreset) }
     }
@@ -86,6 +112,22 @@ final class SettingsStore: ObservableObject {
 
     @Published var totalTimeSavedSeconds: Double {
         didSet { defaults.set(totalTimeSavedSeconds, forKey: Keys.totalTimeSavedSeconds) }
+    }
+
+    @Published var initialPrompt: String {
+        didSet { defaults.set(initialPrompt, forKey: Keys.initialPrompt) }
+    }
+
+    @Published var llmRefinementEnabled: Bool {
+        didSet { defaults.set(llmRefinementEnabled, forKey: Keys.llmRefinementEnabled) }
+    }
+
+    @Published var llmModelPath: String {
+        didSet { defaults.set(llmModelPath, forKey: Keys.llmModelPath) }
+    }
+
+    @Published var llmServerBinaryPath: String {
+        didSet { defaults.set(llmServerBinaryPath, forKey: Keys.llmServerBinaryPath) }
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -127,11 +169,28 @@ final class SettingsStore: ObservableObject {
         self.customTriggerKeycode = defaults.object(forKey: Keys.customTriggerKeycode) as? Int ?? -1
         self.customTriggerFlags = (defaults.string(forKey: Keys.customTriggerFlags).flatMap(UInt64.init)) ?? 0
         self.customTriggerLabel = defaults.string(forKey: Keys.customTriggerLabel) ?? ""
+        self.lockTriggerID = defaults.string(forKey: Keys.lockTriggerID) ?? ""
+        self.customLockTriggerKeycode = defaults.object(forKey: Keys.customLockTriggerKeycode) as? Int ?? -1
+        self.customLockTriggerFlags = (defaults.string(forKey: Keys.customLockTriggerFlags).flatMap(UInt64.init)) ?? 0
+        self.customLockTriggerLabel = defaults.string(forKey: Keys.customLockTriggerLabel) ?? ""
 
         self.launchAtLogin = defaults.object(forKey: Keys.launchAtLogin) as? Bool ?? false
         self.playSounds = defaults.object(forKey: Keys.playSounds) as? Bool ?? true
         self.hasCompletedOnboarding = defaults.bool(forKey: Keys.hasCompletedOnboarding)
         self.totalTimeSavedSeconds = defaults.double(forKey: Keys.totalTimeSavedSeconds)
+        self.initialPrompt = defaults.string(forKey: Keys.initialPrompt) ?? ""
+        self.llmRefinementEnabled = defaults.bool(forKey: Keys.llmRefinementEnabled)
+        self.llmModelPath = defaults.string(forKey: Keys.llmModelPath) ?? ""
+        // Re-detect on every launch when the stored path is empty or no
+        // longer executable (e.g. the user installed llama.cpp after the
+        // first launch, or moved it). A successful auto-detect overwrites
+        // the stored value via didSet on first read of llmRefinementEnabled.
+        let storedLlamaPath = defaults.string(forKey: Keys.llmServerBinaryPath) ?? ""
+        if !storedLlamaPath.isEmpty && FileManager.default.isExecutableFile(atPath: storedLlamaPath) {
+            self.llmServerBinaryPath = storedLlamaPath
+        } else {
+            self.llmServerBinaryPath = SettingsStore.defaultLlamaServerBinaryPath()
+        }
 
         let didSuggest = defaults.bool(forKey: Keys.didSuggestPreset)
         let storedPreset = defaults.string(forKey: Keys.performancePreset)
@@ -149,6 +208,19 @@ final class SettingsStore: ObservableObject {
     func resetDefaultPaths() {
         whisperBinaryPath = SettingsStore.defaultWhisperBinaryPath()
         modelPath = ProjectPaths.defaultModelURL.path
+    }
+
+    // Auto-detect a llama-server binary the first time the LLM refinement
+    // setting is read. The user can install it via Homebrew (`brew install
+    // llama.cpp`) or build from source. We don't hard-fail if missing — the
+    // refinement toggle will surface the error in the menu when activated.
+    private static func defaultLlamaServerBinaryPath() -> String {
+        let candidates = [
+            "/opt/homebrew/bin/llama-server",
+            "/usr/local/bin/llama-server",
+            "\(NSHomeDirectory())/.local/bin/llama-server"
+        ]
+        return candidates.first { FileManager.default.isExecutableFile(atPath: $0) } ?? ""
     }
 
     private static func bundledWhisperBinaryPath() -> String? {

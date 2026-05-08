@@ -51,12 +51,22 @@ struct MenuBarView: View {
             }
 
             Divider()
+            promptSection
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+
+            Divider()
+            llmRefinementSection
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+
+            Divider()
 
             actions
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
         }
-        .frame(width: 300)
+        .frame(width: 320)
     }
 
     private var header: some View {
@@ -104,6 +114,107 @@ struct MenuBarView: View {
                 .lineLimit(4)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    private var promptSection: some View {
+        DisclosureGroup {
+            VStack(alignment: .leading, spacing: 6) {
+                TextEditor(text: $settings.initialPrompt)
+                    .font(.system(size: 12))
+                    .frame(minHeight: 60, maxHeight: 100)
+                    .padding(6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.secondary.opacity(0.08))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .strokeBorder(Color.secondary.opacity(0.20), lineWidth: 1)
+                    )
+
+                Text("Add words you say often that Whisper gets wrong: brand names, technical terms, acronyms. Bias only — Whisper still transcribes what you actually say. Keep it short (under ~150 words). Leave empty to disable.")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if !settings.initialPrompt.isEmpty {
+                    Button {
+                        settings.initialPrompt = ""
+                    } label: {
+                        Text("Clear")
+                            .font(.system(size: 11))
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
+            .padding(.top, 6)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "text.badge.plus")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Text("Dictation hints")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                if !settings.initialPrompt.isEmpty {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 6, height: 6)
+                }
+            }
+        }
+    }
+
+    private var llmRefinementSection: some View {
+        // Quick toggle in the menu bar; full management (model picker,
+        // download, paths) lives in Settings → LLM.
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "wand.and.stars")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Text("LLM refinement")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                if settings.llmRefinementEnabled && !settings.llmModelPath.isEmpty {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 6, height: 6)
+                }
+                Spacer()
+                Toggle("", isOn: $settings.llmRefinementEnabled)
+                    .labelsHidden()
+                    .controlSize(.small)
+                    .toggleStyle(.switch)
+                    .disabled(!llmReady)
+            }
+            if !llmReady {
+                Text("Configure model in Settings → LLM")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            } else if let modelName = currentLlmModelName {
+                Text(modelName)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+        }
+    }
+
+    private var llmReady: Bool {
+        !settings.llmServerBinaryPath.isEmpty &&
+        FileManager.default.isExecutableFile(atPath: settings.llmServerBinaryPath) &&
+        !settings.llmModelPath.isEmpty &&
+        FileManager.default.fileExists(atPath: settings.llmModelPath)
+    }
+
+    private var currentLlmModelName: String? {
+        guard !settings.llmModelPath.isEmpty else { return nil }
+        let url = URL(fileURLWithPath: settings.llmModelPath)
+        return url.deletingPathExtension().lastPathComponent
     }
 
     private func timeSavedBanner(_ label: String) -> some View {

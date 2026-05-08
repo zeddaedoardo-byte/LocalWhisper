@@ -15,6 +15,9 @@ struct SettingsView: View {
             OutputSettingsTab()
                 .tabItem { Label("Output", systemImage: "doc.on.clipboard") }
 
+            LLMSettingsTab()
+                .tabItem { Label("LLM", systemImage: "wand.and.stars") }
+
             AdvancedSettingsTab()
                 .tabItem { Label("Advanced", systemImage: "gearshape.2") }
 

@@ -15,6 +15,7 @@ enum RecordingHUDState: Equatable {
 final class RecordingHUDViewModel: ObservableObject {
     @Published var state: RecordingHUDState = .hidden
     @Published var hint: String = ""
+    @Published var isContinuous: Bool = false
     @Published private(set) var levelHistory: [Float]
 
     var levelDB: Float = -160 {
@@ -38,6 +39,10 @@ private let kHUDHeight: CGFloat = 44
 struct RecordingHUDView: View {
     @ObservedObject var viewModel: RecordingHUDViewModel
 
+    private var showsContinuousBadge: Bool {
+        viewModel.isContinuous && viewModel.state == .recording
+    }
+
     var body: some View {
         ZStack {
             HUDVisualEffect(material: .hudWindow, cornerRadius: 14)
@@ -48,6 +53,18 @@ struct RecordingHUDView: View {
             )
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
+
+            if showsContinuousBadge {
+                Image(systemName: "infinity")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.95))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(Color.red.opacity(0.85), in: Capsule())
+                    .padding(6)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .accessibilityLabel("Continuous recording")
+            }
         }
         .frame(width: kHUDWidth, height: kHUDHeight)
     }
@@ -147,10 +164,18 @@ final class RecordingHUDController {
             cancelScheduledHide()
             hide()
         }
+
+        if state != .recording {
+            viewModel.isContinuous = false
+        }
     }
 
     func update(levelDB: Float) {
         viewModel.levelDB = levelDB
+    }
+
+    func setContinuous(_ isContinuous: Bool) {
+        viewModel.isContinuous = isContinuous
     }
 
     private func show() {

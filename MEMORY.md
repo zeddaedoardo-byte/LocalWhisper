@@ -19,6 +19,8 @@
 - [domain] macOS: Control hold push-to-talk globale usa `CGEvent` tap `flagsChanged`, non `NSEvent.addGlobalMonitorForEvents`. Richiede Accessibility per funzionare fuori dall'app.
 - [domain] UX: Un fallimento di auto-paste non deve marcare la trascrizione come fallita; mostra warning ma lascia stato `completed` e testo in clipboard.
 - [domain] UX: La release di Control puo arrivare mentre `AVAudioRecorder` sta ancora partendo; `AppState` traccia `isPushToTalkHeld` e ferma/trascrive appena la registrazione diventa attiva.
+- [domain] Continuous (hands-free) recording: trigger DEDICATO separato dal primary push-to-talk (no double-tap). `PushToTalkService` mantiene due state machine indipendenti — primary (hold/release) e lock (toggle on press). Il lock combo si configura in HotkeySettingsTab; default OFF. La stessa CGEvent tap callback valuta entrambi i trigger su ogni `flagsChanged`. Toggle del lock combo: tap = avvia continuous (o promuove un hold attivo senza restart audio); tap successivo = stop. Auto-stop secondario via `SilenceWatchdog`. Zero latenza extra sul primary, niente race tra release-timer e promozione.
+- [domain] `SilenceWatchdog` non si arma finche non rileva ≥0.5s di voce sopra `-45 dB`. Continuous senza voce non si auto-ferma — solo nuovo tap manuale del lock combo. Threshold `-45 dB` calibrato sul `peakDB()` esistente di `AudioRecorderService` (16 kHz mono Int16).
 - [domain] whisper.cpp: `whisper-cli`/`whisper-server` accettano WAV 16-bit. `AudioRecorderService` registra direttamente WAV PCM 16 kHz mono.
 - [domain] SwiftPM: `.build` dentro iCloud Drive puo dare `input file was modified during the build`. Run script usa `/private/tmp/local-whisperflow-swiftpm-build`.
 - [domain] iCloud Drive puo bloccare temporaneamente la lettura di un file appena scritto (race con sync). Se un Read/Edit fallisce con timeout, attendere qualche secondo e riprovare.
@@ -33,6 +35,6 @@
 - [procedural] GitHub non deve includere `Models/*.bin` (modelli Whisper grandi).
 
 ## Stato corrente (aggiornato ogni sessione)
-- Ultima sessione: 2026-05-02
-- Cosa e stato fatto: pipeline end-to-end resa funzionante. Rebuild whisper.cpp statico con Metal+Accelerate (fix rpath rotto dopo move iCloud). Modello spostato fuori iCloud in Application Support (fix lazy-load 200 s). Sostituito spawn-per-dictation con `WhisperServerWorker` persistente. Aggiunto warmup automatico. Aggiunti signal handler + atexit per cleanup server. Migrazione UserDefaults stale. Smoke test: ready 2-40 s, inference 2.6 s su 11 s audio.
-- Blocchi aperti: verifica live con microfono reale + auto-paste in app concreta richiede l'utente.
+- Ultima sessione: 2026-05-08
+- Cosa e stato fatto: aggiunta modalita continuous via SECONDO trigger configurabile (lock-in combo, separato dal primary). Iterazione: prima implementato via double-press detection sullo stesso tasto, poi scartato per UX e sostituito con secondo hotkey dedicato. `PushToTalkService` ora gestisce due state machine in parallelo (primary hold + lock toggle on-press). `SettingsStore` espone `lockTriggerID` + custom keycode/flags. `HotkeySettingsTab` ha sezione "Continuous lock" con picker + capture; default OFF. `AppState.toggleContinuousLock()` accende/spegne continuous, promuove un hold attivo senza riavviare l'audio. HUD mostra badge "infinity" rosso quando in continuous. `SilenceWatchdog` invariato (auto-stop dopo 2s di silenzio post-arming).
+- Blocchi aperti: verifica live con lock combo reale. Codex peer review pendente.

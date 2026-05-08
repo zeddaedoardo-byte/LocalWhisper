@@ -95,10 +95,13 @@ final class PushToTalkService {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var stateMachine = PushToTalkStateMachine()
+    private var lockStateMachine = PushToTalkStateMachine()
     private var onPress: (() -> Void)?
     private var onRelease: (() -> Void)?
+    private var onLockToggle: (() -> Void)?
 
     nonisolated(unsafe) private static var currentTrigger: PushToTalkTrigger = .fn
+    nonisolated(unsafe) private static var currentLockTrigger: PushToTalkTrigger? = nil
     private static let triggerLock = NSLock()
 
     static func setTrigger(_ trigger: PushToTalkTrigger) {
@@ -113,14 +116,31 @@ final class PushToTalkService {
         return currentTrigger
     }
 
+    static func setLockTrigger(_ trigger: PushToTalkTrigger?) {
+        triggerLock.lock()
+        currentLockTrigger = trigger
+        triggerLock.unlock()
+    }
+
+    static func activeLockTrigger() -> PushToTalkTrigger? {
+        triggerLock.lock()
+        defer { triggerLock.unlock() }
+        return currentLockTrigger
+    }
+
     deinit {
         stop()
     }
 
-    func start(onPress: @escaping () -> Void, onRelease: @escaping () -> Void) throws {
+    func start(
+        onPress: @escaping () -> Void,
+        onRelease: @escaping () -> Void,
+        onLockToggle: (() -> Void)? = nil
+    ) throws {
         stop()
         self.onPress = onPress
         self.onRelease = onRelease
+        self.onLockToggle = onLockToggle
 
         let trusted = AXIsProcessTrusted()
         PttDebugLog.write("ptt.start trusted=\(trusted)")
@@ -163,15 +183,27 @@ final class PushToTalkService {
         }
 
         stateMachine.reset()
+        lockStateMachine.reset()
     }
 
-    private func dispatchHandle(triggerIsPressed: Bool) {
+    private func dispatchHandle(triggerIsPressed: Bool, isLock: Bool) {
         DispatchQueue.main.async { [weak self] in
-            self?.handle(triggerIsPressed: triggerIsPressed)
+            self?.handle(triggerIsPressed: triggerIsPressed, isLock: isLock)
         }
     }
 
-    private func handle(triggerIsPressed: Bool) {
+    private func handle(triggerIsPressed: Bool, isLock: Bool) {
+        if isLock {
+            guard let transition = lockStateMachine.update(triggerIsPressed: triggerIsPressed) else {
+                return
+            }
+            // Toggle on press only — release of the lock combo is meaningless.
+            if transition == .pressed {
+                onLockToggle?()
+            }
+            return
+        }
+
         guard let transition = stateMachine.update(triggerIsPressed: triggerIsPressed) else {
             return
         }
@@ -224,7 +256,14 @@ final class PushToTalkService {
         let trigger = PushToTalkService.activeTrigger()
         if let pressed = trigger.evaluate(flagsRaw: flagsRaw, keycode: keycode) {
             PttDebugLog.write("ptt.event kc=\(keycode) flags=0x\(String(flagsRaw, radix: 16)) trig=\(trigger.id) pressed=\(pressed)")
-            service.dispatchHandle(triggerIsPressed: pressed)
+            service.dispatchHandle(triggerIsPressed: pressed, isLock: false)
+        }
+
+        if let lockTrigger = PushToTalkService.activeLockTrigger(),
+           lockTrigger.id != trigger.id,
+           let pressed = lockTrigger.evaluate(flagsRaw: flagsRaw, keycode: keycode) {
+            PttDebugLog.write("ptt.lock-event kc=\(keycode) flags=0x\(String(flagsRaw, radix: 16)) trig=\(lockTrigger.id) pressed=\(pressed)")
+            service.dispatchHandle(triggerIsPressed: pressed, isLock: true)
         }
         return Unmanaged.passUnretained(event)
     }

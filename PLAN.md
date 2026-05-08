@@ -1,11 +1,12 @@
 # PLAN.md - LocalWhisper
 
 ## Stato Corrente
-*Aggiornato: 2026-05-02*
+*Aggiornato: 2026-05-08*
 
-**Cosa e attivo ora:** MVP funzionante end-to-end. App menu bar locale, whisper-server persistente con Metal + Accelerate, modello Large V3 Turbo in `~/Library/Application Support/LocalWhisper/Models`, Control hold push-to-talk, auto-paste opzionale.
-**Blocchi:** test di registrazione microfono dal vivo richiede interazione utente e permessi (Microphone + Accessibility).
-**Prossima cosa da fare:** verifica live record/paste in chat reale, poi feedback visivo su warmup/registrazione e gestione errori UX.
+**Cosa e attivo ora (macOS):** MVP funzionante end-to-end + LLM polish + diacritic fix italiano + **modalita continuous via secondo hotkey configurabile (lock-in combo)** (auto-stop dopo ≥2s di silenzio o nuovo tap del combo). Release v0.4.0 firmata + notarizzata.
+**Cosa e attivo ora (Windows):** port C#/WPF presente in `Windows/LocalWhisper.Windows/` su questo branch. Allineamento con main + porting feature continuous-mode in corso.
+**Blocchi:** test live continuous su Windows reale, build .NET / installer richiede macchina Windows.
+**Prossima cosa da fare:** completare porting C# di SilenceWatchdog + lock-trigger in PushToTalkService Windows + UI in SettingsWindow, poi build su Windows.
 
 ---
 

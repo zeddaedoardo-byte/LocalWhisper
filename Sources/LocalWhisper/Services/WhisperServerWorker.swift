@@ -68,7 +68,7 @@ actor WhisperServerWorker {
         try await waitReady()
     }
 
-    func transcribe(audioURL: URL, language: String) async throws -> String {
+    func transcribe(audioURL: URL, language: String, prompt: String = "") async throws -> String {
         let endpoint = URL(string: "http://\(host):\(port)/inference")!
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
@@ -86,6 +86,14 @@ actor WhisperServerWorker {
         body.appendField(name: "response_format", value: "text", boundary: boundary)
         body.appendField(name: "temperature", value: "0.0", boundary: boundary)
         body.appendField(name: "temperature_inc", value: "0.2", boundary: boundary)
+        // Optional initial prompt: biases the decoder toward specific
+        // vocabulary, brand spellings, and acronyms. Whisper truncates
+        // anything beyond ~224 tokens, so a short hint of frequent terms is
+        // the most effective shape.
+        let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedPrompt.isEmpty {
+            body.appendField(name: "prompt", value: trimmedPrompt, boundary: boundary)
+        }
         body.appendFile(name: "file",
                         filename: audioURL.lastPathComponent,
                         mimeType: "audio/wav",
