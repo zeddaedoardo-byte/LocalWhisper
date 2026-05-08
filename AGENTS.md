@@ -1,9 +1,17 @@
 # AGENTS.md - LocalWhisper
 
+## Piattaforme supportate
+Questo repo contiene DUE app nello stesso prodotto:
+- **macOS**: app nativa Swift (root del repo, `Sources/LocalWhisper/`). Branch principale: `main`.
+- **Windows**: port C#/WPF in `Windows/LocalWhisper.Windows/`. Vive sul branch `codex/windows-port`, NON è mergiato su main. Build via `Windows/scripts/build_windows.ps1` (richiede Windows + .NET SDK).
+
+**Regola operativa**: ogni feature di alto livello (push-to-talk, modes, settings, UI shell) va valutata per ENTRAMBE le piattaforme. Se aggiungi una feature solo su macOS, esplicita nel commit/PR che il porting Windows è da fare e apri un follow-up. Non assumere mai "macOS only" senza guardare il branch `codex/windows-port`.
+
 ## Stack e convenzioni
 - macOS app nativa con SwiftPM, SwiftUI, AppKit dove serve, AVFoundation per audio.
-- Motore STT esterno: `whisper.cpp` con server persistente `whisper-server` (HTTP localhost:18642). `whisper-cli` resta come binario di riferimento per i path nelle settings.
-- Modello default: Whisper Large V3 ggml in `~/Library/Application Support/LocalWhisper/Models/ggml-large-v3.bin`. Il modello NON deve stare in iCloud Drive.
+- Windows app C#/.NET (WPF) con WASAPI per audio, Win32 API via P/Invoke per global hotkeys.
+- Motore STT esterno: `whisper.cpp` con server persistente `whisper-server` (HTTP localhost:18642 su macOS; porta dinamica su Windows). `whisper-cli` resta come binario di riferimento per i path nelle settings.
+- Modello default: Whisper Large V3 (Turbo) ggml in `~/Library/Application Support/LocalWhisper/Models/` (macOS) / `%APPDATA%\LocalWhisper\Models\` (Windows). Il modello NON deve stare in iCloud Drive.
 - Codice e commenti in inglese.
 
 ## Comandi principali
