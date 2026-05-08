@@ -69,6 +69,15 @@ public sealed class SettingsStore
         {
             settings.PushToTalkTriggerId = PushToTalkTrigger.LeftControl.Id;
         }
+
+        // Lock trigger is optional. Reset to empty (= disabled) for any
+        // value that does not match a known preset; we do not want a
+        // malformed setting to silently enable a hidden global hotkey.
+        if (!string.IsNullOrEmpty(settings.LockTriggerId)
+            && !PushToTalkTrigger.All.Any(t => t.Id == settings.LockTriggerId))
+        {
+            settings.LockTriggerId = "";
+        }
     }
 
     private void SaveOnChange(object? sender, PropertyChangedEventArgs e)

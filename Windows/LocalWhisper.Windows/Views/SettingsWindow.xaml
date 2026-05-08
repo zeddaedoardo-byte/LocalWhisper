@@ -142,6 +142,16 @@
                     SelectedValuePath="Id"
                     SelectedValue="{Binding Settings.PushToTalkTriggerId, Mode=TwoWay}" />
           <TextBlock Style="{StaticResource HelpText}" Text="Windows does not expose the Mac fn key to normal apps, so Left Ctrl is the default trigger." />
+
+          <TextBlock Style="{StaticResource LabelText}" Margin="0,24,0,4" Text="Continuous lock-in hotkey" />
+          <ComboBox Width="260"
+                    HorizontalAlignment="Left"
+                    ItemsSource="{Binding LockTriggers}"
+                    DisplayMemberPath="Label"
+                    SelectedValuePath="Id"
+                    SelectedValue="{Binding Settings.LockTriggerId, Mode=TwoWay}" />
+          <TextBlock Style="{StaticResource HelpText}"
+                     Text="Optional second hotkey that toggles a hands-free continuous recording. Tap to start (parla), tap again to stop. Auto-stops after ~2s of silence (after detecting at least some speech). Leave Off if you only want hold-to-talk." />
         </StackPanel>
       </TabItem>
 

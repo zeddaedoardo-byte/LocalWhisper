@@ -14,8 +14,11 @@ public sealed class PushToTalkService : IDisposable
     private Action? _onPress;
     private Action? _onRelease;
     private Action? _onEscape;
+    private Action? _onLockToggle;
     private bool _isTriggerPressed;
+    private bool _isLockPressed;
     private PushToTalkTrigger _trigger = PushToTalkTrigger.LeftControl;
+    private PushToTalkTrigger? _lockTrigger;
 
     public PushToTalkService()
     {
@@ -30,16 +33,33 @@ public sealed class PushToTalkService : IDisposable
         {
             _trigger = trigger;
             _isTriggerPressed = false;
+            _isLockPressed = false;
             _pressedKeys.Clear();
         }
     }
 
-    public void Start(Action onPress, Action onRelease, Action? onEscape = null)
+    /// <summary>
+    /// Sets the optional secondary "lock-in" hotkey. Pass null to disable.
+    /// The lock state machine fires <c>onLockToggle</c> only on the
+    /// transition to pressed; releases of the combo are ignored (toggle
+    /// semantics).
+    /// </summary>
+    public void SetLockTrigger(PushToTalkTrigger? trigger)
+    {
+        lock (_stateLock)
+        {
+            _lockTrigger = trigger;
+            _isLockPressed = false;
+        }
+    }
+
+    public void Start(Action onPress, Action onRelease, Action? onEscape = null, Action? onLockToggle = null)
     {
         Stop();
         _onPress = onPress;
         _onRelease = onRelease;
         _onEscape = onEscape;
+        _onLockToggle = onLockToggle;
         _callbackContext = SynchronizationContext.Current;
 
         var moduleHandle = NativeMethods.CurrentModuleHandle();
@@ -67,6 +87,7 @@ public sealed class PushToTalkService : IDisposable
         lock (_stateLock)
         {
             _isTriggerPressed = false;
+            _isLockPressed = false;
             _pressedKeys.Clear();
         }
     }
@@ -102,6 +123,7 @@ public sealed class PushToTalkService : IDisposable
     private void HandleKeyEvent(int virtualKey, bool isDown)
     {
         Action? transition = null;
+        Action? lockTransition = null;
 
         lock (_stateLock)
         {
@@ -120,9 +142,24 @@ public sealed class PushToTalkService : IDisposable
                 _isTriggerPressed = isPressed;
                 transition = isPressed ? _onPress : _onRelease;
             }
+
+            if (_lockTrigger is not null && _lockTrigger.Id != _trigger.Id)
+            {
+                var lockPressed = IsTriggerCurrentlyPressed(_lockTrigger);
+                if (lockPressed != _isLockPressed)
+                {
+                    _isLockPressed = lockPressed;
+                    // Toggle on press only — release of the lock combo is meaningless.
+                    if (lockPressed)
+                    {
+                        lockTransition = _onLockToggle;
+                    }
+                }
+            }
         }
 
         PostTransition(transition);
+        PostTransition(lockTransition);
     }
 
     private void PostTransition(Action? transition)

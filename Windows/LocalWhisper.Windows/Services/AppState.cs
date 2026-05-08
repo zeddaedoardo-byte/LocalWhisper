@@ -15,6 +15,7 @@ public sealed class AppState : INotifyPropertyChanged
     private readonly ClipboardService _clipboardService = new();
     private readonly PasteService _pasteService = new();
     private readonly PushToTalkService _pushToTalkService = new();
+    private readonly SilenceWatchdog _silenceWatchdog = new();
     private readonly ModelDownloader _modelDownloader = new();
     private readonly SemaphoreSlim _recordingLock = new(1, 1);
     private CancellationTokenSource? _warmupCts;
@@ -22,6 +23,16 @@ public sealed class AppState : INotifyPropertyChanged
     private bool _isPushToTalkHeld;
     private bool _isStartingPushToTalkRecording;
     private bool _didAbort;
+    private enum PttMode { Idle, Hold, Continuous }
+    private PttMode _pttMode = PttMode.Idle;
+    /// <summary>
+    /// True while a continuous-mode start is awaiting the audio engine.
+    /// A second lock press during this window flips
+    /// <see cref="_continuousStartCancelled"/> so the post-start code
+    /// discards the recording instead of entering continuous mode.
+    /// </summary>
+    private bool _continuousStartInFlight;
+    private bool _continuousStartCancelled;
     private TranscriptionStatus _status = TranscriptionStatus.Idle;
     private string _lastTranscript = "";
     private string? _lastError;
@@ -86,6 +97,7 @@ public sealed class AppState : INotifyPropertyChanged
     public async Task StartAsync()
     {
         ApplyPushToTalkTrigger();
+        ApplyLockTrigger();
         StartPushToTalk();
         await _audioRecorder.PrewarmAsync();
         ScheduleWarmup();
@@ -98,7 +110,8 @@ public sealed class AppState : INotifyPropertyChanged
             _pushToTalkService.Start(
                 onPress: () => _ = BeginPushToTalkRecordingAsync(),
                 onRelease: () => _ = EndPushToTalkRecordingAsync(),
-                onEscape: AbortInProgress);
+                onEscape: AbortInProgress,
+                onLockToggle: () => _ = ToggleContinuousLockAsync());
             LastError = null;
         }
         catch (Exception ex)
@@ -111,7 +124,10 @@ public sealed class AppState : INotifyPropertyChanged
     public void ResetPushToTalk()
     {
         _pushToTalkService.Stop();
+        _silenceWatchdog.Stop();
+        _pttMode = PttMode.Idle;
         ApplyPushToTalkTrigger();
+        ApplyLockTrigger();
         StartPushToTalk();
     }
 
@@ -215,6 +231,8 @@ public sealed class AppState : INotifyPropertyChanged
 
         _isPushToTalkHeld = false;
         _isStartingPushToTalkRecording = false;
+        _silenceWatchdog.Stop();
+        _pttMode = PttMode.Idle;
         SoundService.Shared.PlayStopListening();
 
         if (Status == TranscriptionStatus.Recording)
@@ -252,6 +270,7 @@ public sealed class AppState : INotifyPropertyChanged
     {
         _warmupCts?.Cancel();
         _transcribeCts?.Cancel();
+        _silenceWatchdog.Stop();
         _pushToTalkService.Stop();
         await _whisperService.ShutdownAsync();
         WhisperServerWorker.TerminateAllRunningServers();
@@ -259,6 +278,16 @@ public sealed class AppState : INotifyPropertyChanged
 
     private async Task BeginPushToTalkRecordingAsync()
     {
+        // While continuous mode is active, the primary trigger acts as an
+        // explicit stop. This is the user's escape hatch when the silence
+        // watchdog doesn't trigger (noisy environment) or when they got
+        // into continuous unintentionally via the lock combo.
+        if (_pttMode == PttMode.Continuous)
+        {
+            await StopContinuousAndTranscribeAsync();
+            return;
+        }
+
         if (Status is TranscriptionStatus.Recording or TranscriptionStatus.Transcribing || _isStartingPushToTalkRecording)
         {
             return;
@@ -266,12 +295,14 @@ public sealed class AppState : INotifyPropertyChanged
 
         _isPushToTalkHeld = true;
         _isStartingPushToTalkRecording = true;
+        _pttMode = PttMode.Hold;
 
         try
         {
             await StartRecordingAsync();
-            if (!_isPushToTalkHeld && Status == TranscriptionStatus.Recording)
+            if (!_isPushToTalkHeld && Status == TranscriptionStatus.Recording && _pttMode == PttMode.Hold)
             {
+                _pttMode = PttMode.Idle;
                 await StopAndTranscribeAsync();
             }
         }
@@ -283,6 +314,14 @@ public sealed class AppState : INotifyPropertyChanged
 
     private async Task EndPushToTalkRecordingAsync()
     {
+        // In continuous mode the physical release of the primary trigger
+        // is irrelevant — the session ends on silence or on another
+        // primary press / lock toggle.
+        if (_pttMode == PttMode.Continuous)
+        {
+            return;
+        }
+
         if (!_isPushToTalkHeld)
         {
             return;
@@ -291,8 +330,125 @@ public sealed class AppState : INotifyPropertyChanged
         _isPushToTalkHeld = false;
         if (Status == TranscriptionStatus.Recording)
         {
+            _pttMode = PttMode.Idle;
             await StopAndTranscribeAsync();
         }
+    }
+
+    /// <summary>
+    /// Toggle entry point for the secondary "lock-in" hotkey. Starts a
+    /// continuous (hands-free) recording, or stops one in progress.
+    /// Promotes an active hold session in-place without restarting audio.
+    /// </summary>
+    private async Task ToggleContinuousLockAsync()
+    {
+        if (_pttMode == PttMode.Continuous)
+        {
+            await StopContinuousAndTranscribeAsync();
+            return;
+        }
+
+        // Second tap arriving while we are still spinning up the audio
+        // engine for a previous lock press. Flag the in-flight start as
+        // cancelled — the async tail will discard the recording instead
+        // of entering continuous mode.
+        if (_continuousStartInFlight)
+        {
+            _continuousStartCancelled = true;
+            return;
+        }
+
+        // Promote an active hold session into continuous without restarting
+        // the audio stream — user pressed-and-held the primary trigger,
+        // then tapped the lock combo to "lock in" before releasing.
+        if (Status == TranscriptionStatus.Recording)
+        {
+            _isPushToTalkHeld = false;
+            EnterContinuousMode();
+            return;
+        }
+
+        if (Status is TranscriptionStatus.Transcribing || _isStartingPushToTalkRecording)
+        {
+            return;
+        }
+
+        _isStartingPushToTalkRecording = true;
+        _continuousStartInFlight = true;
+        _continuousStartCancelled = false;
+
+        try
+        {
+            await StartRecordingAsync();
+
+            if (_continuousStartCancelled)
+            {
+                _continuousStartCancelled = false;
+                DiscardActiveRecording();
+                return;
+            }
+
+            if (Status == TranscriptionStatus.Recording)
+            {
+                EnterContinuousMode();
+            }
+        }
+        finally
+        {
+            _isStartingPushToTalkRecording = false;
+            _continuousStartInFlight = false;
+        }
+    }
+
+    private void EnterContinuousMode()
+    {
+        _pttMode = PttMode.Continuous;
+        StatusMessage = "Recording (continuous)";
+        _hudWindow.ShowContinuous();
+        _silenceWatchdog.Start(_audioRecorder, () => _ = StopContinuousAndTranscribeAsync());
+    }
+
+    private async Task StopContinuousAndTranscribeAsync()
+    {
+        _silenceWatchdog.Stop();
+        if (_pttMode != PttMode.Continuous)
+        {
+            return;
+        }
+
+        _pttMode = PttMode.Idle;
+        if (Status == TranscriptionStatus.Recording)
+        {
+            await StopAndTranscribeAsync();
+        }
+    }
+
+    /// <summary>
+    /// Stops and discards an in-progress recording without going through
+    /// the transcribe pipeline. Used when the user cancels a continuous
+    /// start mid-spinup with a second lock press.
+    /// </summary>
+    private void DiscardActiveRecording()
+    {
+        if (Status != TranscriptionStatus.Recording)
+        {
+            return;
+        }
+
+        try
+        {
+            var path = _audioRecorder.StopRecording();
+            TryDelete(path);
+        }
+        catch
+        {
+        }
+
+        _pttMode = PttMode.Idle;
+        Status = TranscriptionStatus.Idle;
+        StatusMessage = "Idle";
+        LastError = null;
+        _hudWindow.HideHud();
     }
 
     private async Task StartRecordingAsync()
@@ -425,6 +581,7 @@ public sealed class AppState : INotifyPropertyChanged
                 _audioRecorder.PreferredDeviceId = _settings.PreferredMicId;
                 break;
             case nameof(AppSettings.PushToTalkTriggerId):
+            case nameof(AppSettings.LockTriggerId):
                 ResetPushToTalk();
                 break;
             case nameof(AppSettings.PerformancePresetId):
@@ -446,6 +603,11 @@ public sealed class AppState : INotifyPropertyChanged
     private void ApplyPushToTalkTrigger()
     {
         _pushToTalkService.SetTrigger(PushToTalkTrigger.Find(_settings.PushToTalkTriggerId));
+    }
+
+    private void ApplyLockTrigger()
+    {
+        _pushToTalkService.SetLockTrigger(PushToTalkTrigger.FindOrNull(_settings.LockTriggerId));
     }
 
     private void AccumulateTimeSaved(string transcript, string audioPath)

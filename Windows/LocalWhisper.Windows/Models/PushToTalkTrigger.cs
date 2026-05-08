@@ -25,4 +25,19 @@ public sealed record PushToTalkTrigger(string Id, string Label, IReadOnlySet<int
 
     public static PushToTalkTrigger Find(string id) =>
         All.FirstOrDefault(t => string.Equals(t.Id, id, StringComparison.OrdinalIgnoreCase)) ?? LeftControl;
+
+    /// <summary>
+    /// Like <see cref="Find"/> but returns null for empty / unknown ids
+    /// instead of falling back to <see cref="LeftControl"/>. Used by the
+    /// optional lock-in trigger so a malformed setting silently disables
+    /// the feature rather than enabling a hidden global hotkey.
+    /// </summary>
+    public static PushToTalkTrigger? FindOrNull(string? id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return null;
+        }
+        return All.FirstOrDefault(t => string.Equals(t.Id, id, StringComparison.OrdinalIgnoreCase));
+    }
 }

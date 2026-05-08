@@ -31,6 +31,19 @@ public partial class HudWindow : Window
         });
     }
 
+    public void ShowContinuous()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            _hideTimer.Stop();
+            TitleText.Text = "Listening ∞"; // infinity glyph
+            DetailText.Text = "Hands-free — tap the lock combo (or primary) to stop";
+            LevelBar.Visibility = Visibility.Visible;
+            PlaceNearBottom();
+            Show();
+        });
+    }
+
     public void ShowTranscribing()
     {
         Dispatcher.Invoke(() =>

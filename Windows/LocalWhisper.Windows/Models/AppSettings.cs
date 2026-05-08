@@ -12,6 +12,7 @@ public sealed class AppSettings : INotifyPropertyChanged
     private bool _autoPaste = true;
     private string _preferredMicId = "";
     private string _pushToTalkTriggerId = PushToTalkTrigger.LeftControl.Id;
+    private string _lockTriggerId = ""; // empty = continuous lock-in disabled
     private string _performancePresetId = PerformancePreset.Balanced.Id;
     private bool _launchAtLogin;
     private bool _playSounds = true;
@@ -54,6 +55,16 @@ public sealed class AppSettings : INotifyPropertyChanged
     {
         get => _pushToTalkTriggerId;
         set => SetField(ref _pushToTalkTriggerId, value);
+    }
+
+    /// <summary>
+    /// Optional secondary hotkey that toggles continuous (hands-free)
+    /// recording mode. Empty string = disabled (default).
+    /// </summary>
+    public string LockTriggerId
+    {
+        get => _lockTriggerId;
+        set => SetField(ref _lockTriggerId, value ?? "");
     }
 
     public string PerformancePresetId

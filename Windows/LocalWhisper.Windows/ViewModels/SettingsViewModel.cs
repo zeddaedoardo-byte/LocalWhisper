@@ -43,6 +43,17 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
 
         Presets = new ObservableCollection<PerformancePreset>(PerformancePreset.All);
         Triggers = new ObservableCollection<PushToTalkTrigger>(PushToTalkTrigger.All);
+        // Lock trigger collection prepends an "Off" entry whose Id is the
+        // empty string — bound to AppSettings.LockTriggerId, this lets the
+        // user disable the secondary lock-in hotkey from the same picker.
+        LockTriggers = new ObservableCollection<LockTriggerOption>
+        {
+            new("", "Off"),
+        };
+        foreach (var trigger in PushToTalkTrigger.All)
+        {
+            LockTriggers.Add(new LockTriggerOption(trigger.Id, trigger.Label));
+        }
         Devices = new ObservableCollection<AudioDeviceInfo>();
         RefreshDevices();
 
@@ -62,6 +73,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     public ObservableCollection<PerformancePreset> Presets { get; }
 
     public ObservableCollection<PushToTalkTrigger> Triggers { get; }
+
+    public ObservableCollection<LockTriggerOption> LockTriggers { get; }
 
     public ObservableCollection<AudioDeviceInfo> Devices { get; }
 
@@ -175,3 +188,5 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 }
+
+public sealed record LockTriggerOption(string Id, string Label);
