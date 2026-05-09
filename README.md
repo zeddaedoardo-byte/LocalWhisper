@@ -1,27 +1,39 @@
 # LocalWhisper
 
-LocalWhisper is a local macOS menu bar dictation app inspired by WhisperFlow. Hold a hotkey, speak, release — Whisper Large V3 Turbo transcribes everything offline on Apple Silicon (Metal) and the text lands in the active app.
+LocalWhisper is a local dictation app inspired by WhisperFlow. Hold a hotkey, speak, release — Whisper Large V3 Turbo transcribes everything offline and the text lands in the active app.
 
 ![icon](Resources/icon-source.png)
+
+## Platforms
+
+This repository contains two implementations of the same product:
+
+- **macOS** (default): native Swift / SwiftUI menu bar app, optimized for Apple Silicon (Metal + Accelerate). Sources at the repo root (`Sources/LocalWhisper/`). See the macOS sections below.
+- **Windows**: C# / WPF tray app under [`Windows/`](Windows/). Build instructions in [`Windows/README.md`](Windows/README.md). Same product behavior (hold-to-talk, offline transcription, clipboard + auto-paste).
+
+Both ports share the same `whisper.cpp` backend and the same UX: hold-to-talk push-to-talk + an optional secondary "lock-in" hotkey for hands-free continuous recording (auto-stops on ~2 s of silence).
 
 ## Highlights
 
 - 100% local. No cloud, no telemetry, no account.
-- Apple Silicon native: Metal + Accelerate BLAS via a statically built `whisper.cpp`.
+- Apple Silicon native (macOS) or x64/ARM64 .NET (Windows). Statically built `whisper.cpp` with Metal+Accelerate (macOS) / CPU/CUDA/Vulkan (Windows).
 - Persistent in-memory model: each dictation completes in ~2–3 s after the first warmup.
 - On-demand recording HUD with audio level meter and waveform feedback.
-- Configurable hotkey (`fn` by default; supports any modifier or combo).
+- Configurable hotkey (`fn` by default on macOS, `Left Ctrl` on Windows; supports any modifier or combo).
+- Optional **continuous lock-in hotkey**: tap a second combo to keep recording hands-free, auto-stops on silence.
 - Microphone device picker with a 1.5 s test.
-- Tabbed Settings, custom app icon, signed with your local Apple Development identity (or ad-hoc fallback).
+- Tabbed Settings.
 
-## Requirements
+## macOS
+
+### Requirements
 
 - macOS 14 (Sonoma) or newer, Apple Silicon recommended
 - Xcode Command Line Tools (`xcode-select --install`)
 - Homebrew `cmake` (`brew install cmake`)
 - ~5 GB free disk (model + binaries)
 
-## Install (from terminal)
+### Install (from terminal)
 
 ```bash
 git clone https://github.com/zeddaedoardo-byte/LocalWhisper.git
@@ -122,6 +134,27 @@ Regenerate the icon:
 - Audio captured as PCM 16 kHz mono WAV via AVAudioConverter into a temp file.
 - Release the hotkey → multipart POST to `127.0.0.1:18642/inference` (the `whisper-server` child process keeps the model resident).
 - Server returns text → app copies to clipboard → optionally pastes via synthetic Cmd-V.
+
+## Windows
+
+The Windows port lives under [`Windows/`](Windows/) and is a standalone .NET 8 / WPF tray app. It mirrors the macOS feature set (hold-to-talk + continuous lock-in) but uses WASAPI for capture and Win32 low-level keyboard hooks for the global hotkey.
+
+### Quick build
+
+```powershell
+cd Windows
+.\scripts\build_whisper_cpp.ps1   # builds whisper.cpp + downloads the model
+.\scripts\build_windows.ps1       # builds the WPF app
+```
+
+Full setup, GPU acceleration options (CUDA / Vulkan / OpenVINO), and packaging notes are in [`Windows/README.md`](Windows/README.md).
+
+### Requirements (Windows)
+
+- Windows 10 19041 or newer, Windows 11 recommended
+- .NET 8 SDK
+- Visual Studio 2022 Build Tools with the C++ desktop workload
+- Git, CMake
 
 ## Credits
 
