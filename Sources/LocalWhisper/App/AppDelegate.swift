@@ -4,6 +4,7 @@ import Darwin
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        StaleProcessSweeper.sweep(processNames: ["whisper-server", "llama-server"])
         installSignalHandlers()
         atexit {
             WhisperServerWorker.terminateAllRunningServers()
