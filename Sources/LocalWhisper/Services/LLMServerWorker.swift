@@ -175,11 +175,19 @@ actor LLMServerWorker {
         let captureBuffer = LLMStderrBuffer()
         stderr.fileHandleForReading.readabilityHandler = { handle in
             let data = handle.availableData
-            guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
+            // Empty data means EOF (child closed the pipe). Tear down the
+            // dispatch source, otherwise it re-fires forever and spins a core.
+            if data.isEmpty {
+                handle.readabilityHandler = nil
+                return
+            }
+            guard let text = String(data: data, encoding: .utf8) else { return }
             captureBuffer.append(text)
         }
         stdout.fileHandleForReading.readabilityHandler = { handle in
-            _ = handle.availableData
+            if handle.availableData.isEmpty {
+                handle.readabilityHandler = nil
+            }
         }
 
         do {
