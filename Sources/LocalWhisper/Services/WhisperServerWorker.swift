@@ -44,6 +44,31 @@ actor WhisperServerWorker {
     private var currentParams: DecodingParams?
     private var readyTask: Task<Void, Error>?
     private var stderrBuffer = ""
+    // True when the server was started with a silero VAD model loaded, so the
+    // per-request `vad` field is honored. Reset on stop().
+    private var vadModelAvailable = false
+
+    // VAD on long audio truncates badly in whisper.cpp (silero, this build):
+    // it detects speech across the whole file but the decode over the
+    // concatenated speech drops large contiguous spans, so the middle/tail of
+    // long dictations silently vanishes. VAD's only upside is removing
+    // silence-padding hallucinations on very short (sub-2 s) utterances, so we
+    // enable it only at or below this duration and disable it above, where the
+    // bug bites and VAD provides no benefit anyway. Kept deliberately
+    // conservative (10 s) because truncation was observed creeping in around
+    // the mid-teens of seconds.
+    static let vadMaxDurationSeconds: Double = 10.0
+    // AudioRecorderService writes 16 kHz mono int16 PCM => 32000 bytes/s.
+    private static let recordedBytesPerSecond = 16_000 * 1 * 2
+
+    // Pure gating decision over the recorded WAV byte count. Returns true when
+    // the clip is short enough to benefit from VAD without hitting the
+    // long-audio truncation bug.
+    static func shouldUseVAD(audioByteCount: Int) -> Bool {
+        let payloadBytes = max(0, audioByteCount - 44) // strip canonical WAV header
+        let seconds = Double(payloadBytes) / Double(recordedBytesPerSecond)
+        return seconds <= vadMaxDurationSeconds
+    }
 
     init(port: Int = 18642) {
         self.port = port
@@ -94,6 +119,15 @@ actor WhisperServerWorker {
         if !trimmedPrompt.isEmpty {
             body.appendField(name: "prompt", value: trimmedPrompt, boundary: boundary)
         }
+        // Gate VAD per request by clip length. The server starts with --vad on
+        // (when a silero model is present), which would otherwise truncate long
+        // recordings; sending an explicit vad=false above the threshold avoids
+        // that while keeping VAD's short-utterance benefit. No-op when the
+        // server has no VAD model loaded.
+        if vadModelAvailable {
+            let useVAD = Self.shouldUseVAD(audioByteCount: audioData.count)
+            body.appendField(name: "vad", value: useVAD ? "true" : "false", boundary: boundary)
+        }
         body.appendFile(name: "file",
                         filename: audioURL.lastPathComponent,
                         mimeType: "audio/wav",
@@ -136,6 +170,7 @@ actor WhisperServerWorker {
         currentBinary = nil
         currentModel = nil
         currentParams = nil
+        vadModelAvailable = false
         stderrBuffer = ""
     }
 
@@ -189,7 +224,8 @@ actor WhisperServerWorker {
         // utterances and shaves the encoder cost a bit on top.
         let modelDir = (modelPath as NSString).deletingLastPathComponent
         let vadPath = (modelDir as NSString).appendingPathComponent("ggml-silero-v5.1.2.bin")
-        if fm.fileExists(atPath: vadPath) {
+        let vadModelPresent = fm.fileExists(atPath: vadPath)
+        if vadModelPresent {
             arguments.append(contentsOf: [
                 "--vad",
                 "--vad-model", vadPath
@@ -230,6 +266,7 @@ actor WhisperServerWorker {
         currentBinary = serverBinaryPath
         currentModel = modelPath
         currentParams = params
+        vadModelAvailable = vadModelPresent
         stderrBuffer = ""
 
         let host = self.host

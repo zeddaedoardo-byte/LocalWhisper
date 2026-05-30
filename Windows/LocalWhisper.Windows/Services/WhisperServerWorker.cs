@@ -28,6 +28,26 @@ public sealed class WhisperServerWorker
     // than this are almost certainly truncated or corrupted captures.
     private const long MinValidWavBytes = 1024;
 
+    // VAD on long audio truncates badly in whisper.cpp (silero, this build): it
+    // detects speech across the whole file but the decode over the concatenated
+    // speech drops large contiguous spans, so the middle/tail of long dictations
+    // silently vanishes. VAD's only upside is removing silence-padding
+    // hallucinations on very short (sub-2 s) utterances, so we enable it per
+    // request only at or below this duration and disable it above. Kept
+    // deliberately conservative (10 s) because truncation was observed creeping
+    // in around the mid-teens of seconds.
+    private const double VadMaxDurationSeconds = 10.0;
+    // The recorder writes 16 kHz mono int16 PCM => 32000 bytes/s.
+    private const long RecordedBytesPerSecond = 16_000 * 1 * 2;
+
+    // Pure gating decision over the recorded WAV byte count.
+    internal static bool ShouldUseVad(long audioByteCount)
+    {
+        var payloadBytes = Math.Max(0, audioByteCount - 44); // strip canonical WAV header
+        var seconds = payloadBytes / (double)RecordedBytesPerSecond;
+        return seconds <= VadMaxDurationSeconds;
+    }
+
     private readonly object _stateLock = new();
     private readonly string _host = "127.0.0.1";
     // Port is allocated freshly per Start() so we never accept readiness from
@@ -40,6 +60,9 @@ public sealed class WhisperServerWorker
     private PerformancePreset? _currentPreset;
     private Task? _readyTask;
     private readonly List<string> _stderrBuffer = [];
+    // True when the server was started with a silero VAD model loaded, so the
+    // per-request `vad` field is honored. Reset on StopAsync().
+    private bool _vadModelAvailable;
 
     public bool IsRunning => _process?.HasExited == false;
 
@@ -111,6 +134,16 @@ public sealed class WhisperServerWorker
         form.Add(new StringContent("text"), "response_format");
         form.Add(new StringContent("0.0"), "temperature");
         form.Add(new StringContent("0.2"), "temperature_inc");
+        // Gate VAD per request by clip length. The server starts with --vad on
+        // (when a silero model is present), which would otherwise truncate long
+        // recordings; sending an explicit vad=false above the threshold avoids
+        // that while keeping VAD's short-utterance benefit. No-op when the
+        // server has no VAD model loaded.
+        if (_vadModelAvailable)
+        {
+            var useVad = ShouldUseVad(stream.Length);
+            form.Add(new StringContent(useVad ? "true" : "false"), "vad");
+        }
         form.Add(fileContent, "file", Path.GetFileName(audioPath));
 
         var endpoint = $"http://{_host}:{_port}/inference";
@@ -155,6 +188,7 @@ public sealed class WhisperServerWorker
             _currentBinary = null;
             _currentModel = null;
             _currentPreset = null;
+            _vadModelAvailable = false;
             _readyTask = null;
             _stderrBuffer.Clear();
         }
@@ -212,7 +246,8 @@ public sealed class WhisperServerWorker
         startInfo.ArgumentList.Add(preset.AudioContext.ToString());
 
         var vadPath = Path.Combine(Path.GetDirectoryName(modelPath) ?? "", "ggml-silero-v5.1.2.bin");
-        if (File.Exists(vadPath))
+        var vadModelPresent = File.Exists(vadPath);
+        if (vadModelPresent)
         {
             startInfo.ArgumentList.Add("--vad");
             startInfo.ArgumentList.Add("--vad-model");
@@ -270,6 +305,7 @@ public sealed class WhisperServerWorker
             _currentBinary = serverBinaryPath;
             _currentModel = modelPath;
             _currentPreset = preset;
+            _vadModelAvailable = vadModelPresent;
             _readyTask = PollReadyAsync(process, TimeSpan.FromSeconds(90));
         }
     }
