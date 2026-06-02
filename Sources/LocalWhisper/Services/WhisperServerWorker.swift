@@ -147,11 +147,25 @@ actor WhisperServerWorker {
         }
 
         let raw = String(data: data, encoding: .utf8) ?? ""
-        let cleaned = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleaned = Self.normalizeTranscript(raw)
         guard !cleaned.isEmpty else {
             throw WhisperError.emptyTranscript
         }
         return cleaned
+    }
+
+    // whisper-server (response_format=text) emits one line per decode window /
+    // VAD segment, so long dictations come back as several `\n`-separated
+    // lines. Those breaks are arbitrary segment boundaries, not semantic line
+    // breaks: left in, they fragment the dictation when pasted into apps that
+    // treat newline as submit (chat inputs, search fields, single-line forms),
+    // so the user sees only the last line. Collapse every run of whitespace
+    // (incl. newlines and the leading space each segment carries) into a single
+    // space to keep the transcript one continuous line.
+    static func normalizeTranscript(_ raw: String) -> String {
+        raw.components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
     }
 
     func stop() async {
